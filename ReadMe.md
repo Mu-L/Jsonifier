@@ -1,4 +1,5 @@
 # Jsonifier
+## NOTE: Jsonifier is currently temporarily not-under-development. Should be returning soon with a full suite of unit tests.
 ![Commit Activity](https://img.shields.io/github/commit-activity/y/realtimechris/jsonifier?color=999EE0&label=Commits&style=plastic)
 ![Lines of Code](https://tokei.rs/b1/github/RealTimeChris/Jsonifier-Code-Only?color=light-blue&label=Lines%20Of%20Code%20&style=plastic)
 
