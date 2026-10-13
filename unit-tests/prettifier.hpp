@@ -20,19 +20,19 @@ namespace prettifier_tests {
 			return success ? buffer : std::string{ "FAILED" };
 		};
 
-		auto buildNestedArrays = [](size_t depth) {
+		auto buildNestedArrays = [](uint64_t depth) {
 			std::string openBrackets(depth, '[');
 			std::string closeBrackets(depth, ']');
 			return openBrackets + "1" + closeBrackets;
 		};
 
-		auto buildExpectedNestedArrays = [](size_t depth) {
+		auto buildExpectedNestedArrays = [](uint64_t depth) {
 			std::string expected{};
-			for (size_t x = 0; x < depth; ++x) {
+			for (uint64_t x = 0; x < depth; ++x) {
 				expected += std::string(x * 3, ' ') + "[\n";
 			}
 			expected += std::string(depth * 3, ' ') + "1\n";
-			for (size_t x = depth; x > 0; --x) {
+			for (uint64_t x = depth; x > 0; --x) {
 				expected += std::string((x - 1) * 3, ' ') + "]";
 				if (x > 1) {
 					expected += "\n";

@@ -67,7 +67,7 @@ namespace bounds_tests {
 			return;
 		}
 
-		const size_t size = input.size();
+		const uint64_t size = input.size();
 		if (size >= 2000) {
 			int64_t newSize = static_cast<int64_t>((input.size() * 9 / 10) - randomDie());
 			if (newSize > 0) {

@@ -18,7 +18,7 @@ namespace jsonifier {
 	using write_structural_index_ptr  = uint32_t*;
 	using write_buffer_ptr			  = uint8_t*;
 
-	static constexpr uint64_t maxSimdBytesPerRegister{ internal::cpu_properties::get_value(internal::cpu_property_types::alignment) };
+	alignas(64) inline constexpr uint64_t maxSimdBytesPerRegister{ internal::cpu_properties::get_value(internal::cpu_property_types::alignment) };
 
 	enum class jsonifier_backend : uint8_t {
 		fallback,
@@ -105,8 +105,8 @@ namespace jsonifier {
 
 #endif
 
-	template<jsonifier_backend backend> static constexpr uint64_t backendBytesPerRegister{ sizeof(typename backend_traits<backend>::simd_int_t) };
-	template<jsonifier_backend backend> static constexpr uint64_t backendRegistersPerBlock{ 64 / backendBytesPerRegister<backend> };
-	template<jsonifier_backend backend> static constexpr uint64_t backendBytesPerStep{ backend_traits<backend>::blocksPerStep * 64 };
+	template<jsonifier_backend backend> alignas(64) inline constexpr uint64_t backendBytesPerRegister{ sizeof(typename backend_traits<backend>::simd_int_t) };
+	template<jsonifier_backend backend> alignas(64) inline constexpr uint64_t backendRegistersPerBlock{ 64 / backendBytesPerRegister<backend> };
+	template<jsonifier_backend backend> alignas(64) inline constexpr uint64_t backendBytesPerStep{ backend_traits<backend>::blocksPerStep * 64 };
 
 }

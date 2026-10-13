@@ -127,7 +127,7 @@ namespace jsonifier {
 			return number_type == number_types::uint64 ? uint_val : 0;
 		}
 
-		JSONIFIER_INLINE json_number() noexcept : uint_val(0), number_type(number_types::uint64) {
+		JSONIFIER_INLINE json_number() noexcept : uint_val{ 0 }, number_type{ number_types::uint64 } {
 		}
 
 		JSONIFIER_INLINE number_types getType() const {

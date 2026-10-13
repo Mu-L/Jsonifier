@@ -10,93 +10,38 @@
 
 namespace jsonifier::internal {
 
-	template<std::endian, uint64_t size = 0> struct int_tables_impl;
+	template<uint64_t count> inline static consteval uint64_t gen_table_size() {
+		uint64_t result = 1;
+		for (uint64_t j = 0; j < count; ++j) {
+			result *= 10;
+		}
+		return result;
+	}
 
-	template<std::endian endianness> inline static constexpr array<uint32_t, 256> gen_1() {
-		array<uint32_t, 256> t{};
-		for (uint32_t i = 0; i < 256; ++i) {
-			const uint32_t d0	 = static_cast<uint8_t>('0') + (i / 100);
-			const uint32_t d1	 = static_cast<uint8_t>('0') + (i / 10 % 10);
-			const uint32_t d2	 = static_cast<uint8_t>('0') + (i % 10);
-			const uint32_t len	 = i > 99u ? 3u : i > 9u ? 2u : 1u;
-			const uint32_t shift = 8u * (3u - len);
-			if constexpr (endianness == std::endian::little) {
-				t[i] = ((d0 | (d1 << 8) | (d2 << 16)) >> shift) | (len << 24);
-			} else {
-				t[i] = ((d0 << 24) | (d1 << 16) | (d2 << 8)) << shift;
+	template<uint64_t count> using gen_table_value_t = conditional_t<(count <= 2ULL), uint16_t, uint32_t>;
+
+	template<uint64_t count> inline static consteval array<gen_table_value_t<count>, gen_table_size<count>()> gen_table() {
+		using value_type		= gen_table_value_t<count>;
+		constexpr uint64_t size = gen_table_size<count>();
+		array<value_type, size> t{};
+		for (uint64_t i = 0; i < size; ++i) {
+			uint64_t divisor = size / 10;
+			for (uint64_t j = 0; j < count; ++j) {
+				const auto digit	 = static_cast<value_type>(static_cast<uint8_t>('0') + (i / divisor % 10));
+				const uint64_t shift = (std::endian::native == std::endian::little ? j : sizeof(value_type) - 1 - j) * 8;
+				t[i] |= static_cast<value_type>(digit << shift);
+				divisor /= 10;
 			}
 		}
 		return t;
 	}
 
-	template<std::endian endianness> inline static constexpr array<uint16_t, 100> gen_2() {
-		array<uint16_t, 100> t{};
-		for (uint32_t i = 0; i < 100; ++i) {
-			if constexpr (endianness == std::endian::little) {
-				t[i] |= static_cast<uint16_t>(static_cast<uint8_t>('0') + (i / 10));
-				t[i] |= static_cast<uint16_t>(static_cast<uint8_t>('0') + (i % 10)) << 8;
-			} else {
-				t[i] |= static_cast<uint16_t>(static_cast<uint8_t>('0') + (i / 10)) << 8;
-				t[i] |= static_cast<uint16_t>(static_cast<uint8_t>('0') + (i % 10));
-			}
-		}
-		return t;
-	}
-
-	template<std::endian endianness> inline static constexpr array<uint32_t, 1000> gen_3() {
-		array<uint32_t, 1000> t{};
-		for (uint32_t i = 0; i < 1000; ++i) {
-			const uint32_t d0 = static_cast<uint8_t>('0') + (i / 100);
-			const uint32_t d1 = static_cast<uint8_t>('0') + (i / 10 % 10);
-			const uint32_t d2 = static_cast<uint8_t>('0') + (i % 10);
-			if constexpr (endianness == std::endian::little) {
-				t[i] = d0 | (d1 << 8) | (d2 << 16);
-			} else {
-				t[i] = (d0 << 24) | (d1 << 16) | (d2 << 8);
-			}
-		}
-		return t;
-	}
-
-	template<std::endian endianness> inline static constexpr array<uint32_t, 10000> gen_4() {
-		array<uint32_t, 10000> t{};
-		for (uint32_t i = 0; i < 10000; ++i) {
-			if constexpr (endianness == std::endian::little) {
-				t[i] |= static_cast<uint32_t>(static_cast<uint8_t>('0') + (i / 1000));
-				t[i] |= static_cast<uint32_t>(static_cast<uint8_t>('0') + (i / 100 % 10)) << 8;
-				t[i] |= static_cast<uint32_t>(static_cast<uint8_t>('0') + (i / 10 % 10)) << 16;
-				t[i] |= static_cast<uint32_t>(static_cast<uint8_t>('0') + (i % 10)) << 24;
-			} else {
-				t[i] |= static_cast<uint32_t>(static_cast<uint8_t>('0') + (i / 1000)) << 24;
-				t[i] |= static_cast<uint32_t>(static_cast<uint8_t>('0') + (i / 100 % 10)) << 16;
-				t[i] |= static_cast<uint32_t>(static_cast<uint8_t>('0') + (i / 10 % 10)) << 8;
-				t[i] |= static_cast<uint32_t>(static_cast<uint8_t>('0') + (i % 10));
-			}
-		}
-		return t;
-	}
-
-	template<std::endian endianness> struct int_tables_impl<endianness, 1> {
-		alignas(64) static constexpr array<uint32_t, 256> table{ gen_1<endianness>() };
-		alignas(64) static constexpr read_structural_index_ptr __restrict values{ table.data() };
-	};
-
-	template<std::endian endianness> struct int_tables_impl<endianness, 2> {
-		alignas(64) static constexpr array<uint16_t, 100> table{ gen_2<endianness>() };
-		alignas(64) static constexpr const uint16_t* __restrict values{ table.data() };
-	};
-
-	template<std::endian endianness> struct int_tables_impl<endianness, 3> {
-		alignas(64) static constexpr array<uint32_t, 1000> table{ gen_3<endianness>() };
-		alignas(64) static constexpr read_structural_index_ptr __restrict values{ table.data() };
-	};
-
-	template<std::endian endianness> struct int_tables_impl<endianness, 4> {
-		alignas(64) static constexpr array<uint32_t, 10000> table{ gen_4<endianness>() };
-		alignas(64) static constexpr read_structural_index_ptr __restrict values{ table.data() };
-	};
-
-	template<uint64_t size> using int_tables = int_tables_impl<std::endian::native, size>;
+	alignas(64) inline constexpr auto table_02{ gen_table<2ULL>() };
+	alignas(64) inline constexpr const auto* __restrict char_table_2_digit_data = table_02.data();
+	alignas(64) inline constexpr auto table_03{ gen_table<3ULL>() };
+	alignas(64) inline constexpr const auto* __restrict char_table_3_digit_data = table_03.data();
+	alignas(64) inline constexpr auto table_04{ gen_table<4ULL>() };
+	alignas(64) inline constexpr const auto* __restrict char_table_4_digit_data = table_04.data();
 
 #if !JSONIFIER_COMPILER_CLANG && !JSONIFIER_COMPILER_GCC && !JSONIFIER_COMPILER_MSVC
 
@@ -132,10 +77,6 @@ namespace jsonifier::internal {
 #endif
 		}
 	};
-
-	static constexpr const auto* __restrict char_table_2_digit_data = int_tables<2>::values;
-	static constexpr const auto* __restrict char_table_3_digit_data = int_tables<3>::values;
-	static constexpr const auto* __restrict char_table_4_digit_data = int_tables<4>::values;
 
 	template<uint_types v_type> JSONIFIER_INLINE static void copy_3_digits(write_buffer_ptr __restrict buf, const v_type value) noexcept {
 		uint32_t packed;
@@ -454,4 +395,4 @@ namespace jsonifier::internal {
 		}
 	};
 
-};// namespace internal
+}

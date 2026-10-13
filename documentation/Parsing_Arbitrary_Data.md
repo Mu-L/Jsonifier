@@ -10,7 +10,7 @@ Use `raw_json_data` as the destination for any JSON you don't want to (or can't)
 #include <jsonifier>
 #include <iostream>
 
-int main() {
+int32_t main() {
     jsonifier::jsonifier_core<> parser;
 
     std::string json = R"({"name":"Concert","count":42,"tags":["music","live"]})";
@@ -102,7 +102,7 @@ template<> struct jsonifier::core<message> {
         &value_type::payload>();
 };
 
-int main() {
+int32_t main() {
     jsonifier::jsonifier_core<> parser;
     message msg;
 
@@ -195,7 +195,7 @@ template<> struct jsonifier::core<discord_message> {
         &value_type::data>();
 };
 
-int main() {
+int32_t main() {
     jsonifier::jsonifier_core<> parser;
 
     std::string message_created = R"({

@@ -11,36 +11,33 @@
 
 namespace jsonifier::internal {
 
-	template<typename = void> struct exp_tables {
-		static constexpr bool expTable[]{ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
+	consteval array<bool, 256> generateExpTable() noexcept {
+		array<bool, 256> table{};
+		table['E'] = true;
+		table['e'] = true;
+		return table;
+	}
 
-		static constexpr bool expFracTable[]{ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-			false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false };
-	};
+	template<typename = void> alignas(64) inline constexpr array<bool, 256> expTableRaw = generateExpTable();
 
-	static constexpr char decimal{ '.' };
-	static constexpr char minus{ '-' };
-	static constexpr char plus{ '+' };
-	static constexpr char nine{ '9' };
+	alignas(64) inline constexpr const bool* __restrict expTable{ expTableRaw<>.data() };
+
+	consteval array<bool, 256> generateExpFracTable() noexcept {
+		array<bool, 256> table{};
+		table['.'] = true;
+		table['E'] = true;
+		table['e'] = true;
+		return table;
+	}
+
+	template<typename = void> alignas(64) inline constexpr array<bool, 256> expFracTableRaw = generateExpFracTable();
+
+	alignas(64) inline constexpr const bool* __restrict expFracTable{ expFracTableRaw<>.data() };
+
+	alignas(64) inline constexpr char decimal{ '.' };
+	alignas(64) inline constexpr char minus{ '-' };
+	alignas(64) inline constexpr char plus{ '+' };
+	alignas(64) inline constexpr char nine{ '9' };
 
 	struct parsed_number {
 		read_buffer_ptr lastMatch{};

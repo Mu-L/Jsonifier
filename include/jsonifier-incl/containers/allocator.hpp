@@ -194,4 +194,4 @@ namespace jsonifier::internal {
 		static_assert(alignment >= alignof(allocation_header), "alignment must cover allocation_header's alignment requirement.");
 	};
 
-}// namespace internal
+}

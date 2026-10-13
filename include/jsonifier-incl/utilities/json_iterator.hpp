@@ -651,8 +651,8 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 		uint64_t pass{};
 		uint64_t fail{};
 		~ws_tracker() {
-			out << "Fail: " << fail << endl;
-			out << "Pass: " << pass << endl;
+			cout << "Fail: " << fail << endl;
+			cout << "Pass: " << pass << endl;
 		}
 	};
 
@@ -675,27 +675,27 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 
 		JSONIFIER_INLINE static bool atWhitespace(read_buffer_ptr iter, [[maybe_unused]] auto& context) noexcept {
 			if constexpr (parseOpts.nullTerminated) {
-				return whitespaceTable[static_cast<uint8_t>(*iter)];
+				return whitespaceTable[static_cast<uint64_t>(*iter)];
 			} else {
-				return iter < context.endIter && whitespaceTable[static_cast<uint8_t>(*iter)];
+				return iter < context.endIter && whitespaceTable[static_cast<uint64_t>(*iter)];
 			}
 		}
 
 		JSONIFIER_INLINE static bool atNewline(read_buffer_ptr iter, [[maybe_unused]] auto& context) noexcept {
 			if constexpr (parseOpts.nullTerminated) {
-				return newlineTable[static_cast<uint8_t>(*iter)];
+				return newlineTable[static_cast<uint64_t>(*iter)];
 			} else {
-				return iter < context.endIter && newlineTable[static_cast<uint8_t>(*iter)];
+				return iter < context.endIter && newlineTable[static_cast<uint64_t>(*iter)];
 			}
 		}
 
 		JSONIFIER_INLINE static read_buffer_ptr skipNewline(read_buffer_ptr iterLocal, [[maybe_unused]] auto& context) noexcept {
 			if constexpr (parseOpts.nullTerminated) {
-				while (newlineTable[static_cast<uint8_t>(*iterLocal)]) {
+				while (newlineTable[static_cast<uint64_t>(*iterLocal)]) {
 					++iterLocal;
 				}
 			} else {
-				while (iterLocal < context.endIter && newlineTable[static_cast<uint8_t>(*iterLocal)]) {
+				while (iterLocal < context.endIter && newlineTable[static_cast<uint64_t>(*iterLocal)]) {
 					++iterLocal;
 				}
 			}
@@ -826,11 +826,11 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 
 		JSONIFIER_INLINE static void skipWhitespaceScalar(read_buffer_ptr& iter, [[maybe_unused]] auto& context) noexcept {
 			if constexpr (parseOpts.nullTerminated) {
-				while (whitespaceTable[static_cast<uint8_t>(*iter)]) {
+				while (whitespaceTable[static_cast<uint64_t>(*iter)]) {
 					++iter;
 				}
 			} else {
-				while (iter < context.endIter && whitespaceTable[static_cast<uint8_t>(*iter)]) {
+				while (iter < context.endIter && whitespaceTable[static_cast<uint64_t>(*iter)]) {
 					++iter;
 				}
 			}
@@ -844,7 +844,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 					uintptr_t res{ std::bit_cast<uintptr_t>(spanIsIndent(probe, predicted, context.wsChar)) };
 					indent_result_types result{ get_tag(res) };
 					auto iterNew = strip_tag(res);
-					if (result == indent_result_types::success && !whitespaceTable[static_cast<uint8_t>(*iterNew)]) [[likely]] {
+					if (result == indent_result_types::success && !whitespaceTable[static_cast<uint64_t>(*iterNew)]) [[likely]] {
 						iter = iterNew;
 						return;
 					}
@@ -865,18 +865,18 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 
 		template<typename context_type> JSONIFIER_INLINE static void collectIndentSize(read_buffer_ptr iter, context_type& context) noexcept {
 			read_buffer_ptr probe{ iter };
-			while (probe < context.endIter && whitespaceTable[static_cast<uint8_t>(*probe)]) {
+			while (probe < context.endIter && whitespaceTable[static_cast<uint64_t>(*probe)]) {
 				++probe;
 			}
 			if (probe >= context.endIter || (*probe != '{' && *probe != '[')) {
 				return;
 			}
 			++probe;
-			if (probe >= context.endIter || !newlineTable[static_cast<uint8_t>(*probe)]) {
+			if (probe >= context.endIter || !newlineTable[static_cast<uint64_t>(*probe)]) {
 				return;
 			}
 			probe = skipNewline(probe, context);
-			if (probe >= context.endIter || !whitespaceTable[static_cast<uint8_t>(*probe)]) {
+			if (probe >= context.endIter || !whitespaceTable[static_cast<uint64_t>(*probe)]) {
 				return;
 			}
 			context.wsChar = *probe;
@@ -1320,13 +1320,13 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 
 	alignas(64) static constexpr auto validPostPrimitiveTable{ [] {
 		array<bool, 256> table{};
-		table[static_cast<uint8_t>(',')]  = true;
-		table[static_cast<uint8_t>('}')]  = true;
-		table[static_cast<uint8_t>(']')]  = true;
-		table[static_cast<uint8_t>(' ')]  = true;
-		table[static_cast<uint8_t>('\t')] = true;
-		table[static_cast<uint8_t>('\n')] = true;
-		table[static_cast<uint8_t>('\r')] = true;
+		table[static_cast<uint64_t>(',')]  = true;
+		table[static_cast<uint64_t>('}')]  = true;
+		table[static_cast<uint64_t>(']')]  = true;
+		table[static_cast<uint64_t>(' ')]  = true;
+		table[static_cast<uint64_t>('\t')] = true;
+		table[static_cast<uint64_t>('\n')] = true;
+		table[static_cast<uint64_t>('\r')] = true;
 		return table;
 	}() };
 
@@ -1390,7 +1390,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 			if (first == '{' || first == '[') {
 				int64_t depth{};
 				while (iter < context.endIter) {
-					depth += nestingDeltaTable[static_cast<uint8_t>(context.stringRoot[*iter])];
+					depth += nestingDeltaTable[static_cast<uint64_t>(context.stringRoot[*iter])];
 					++iter;
 					if (depth == 0) {
 						return true;
@@ -1408,7 +1408,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 			}
 			int64_t depth{ 1 };
 			while (iter < context.endIter) {
-				depth += nestingDeltaTable[static_cast<uint8_t>(context.stringRoot[*iter])];
+				depth += nestingDeltaTable[static_cast<uint64_t>(context.stringRoot[*iter])];
 				++iter;
 				if (depth == 0) {
 					return true;
@@ -1418,7 +1418,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 		}
 
 		template<typename context_type> JSONIFIER_INLINE static bool checkPostPrimitive(read_buffer_ptr iterNew, write_structural_index_ptr iter, context_type& context) noexcept {
-			if (iterNew < context.stringEnd && !validPostPrimitiveTable[static_cast<uint8_t>(*iterNew)]) [[unlikely]] {
+			if (iterNew < context.stringEnd && !validPostPrimitiveTable[static_cast<uint64_t>(*iterNew)]) [[unlikely]] {
 				return reject<parse_statuses::missing_comma>(iter, context);
 			}
 			return true;

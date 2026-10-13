@@ -28,7 +28,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 	template<typename value_type>
 	concept gt_16 = base_t<value_type>::length > 16 && !eq_16<value_type> && !eq_32<value_type> && !eq_64<value_type>;
 
-	template<uint8_t repeat, uint_types return_type> inline static constexpr return_type repeatByte() noexcept {
+	template<uint8_t repeat, uint_types return_type> inline static consteval return_type repeatByte() noexcept {
 		return static_cast<return_type>(0x0101010101010101ull) * static_cast<return_type>(repeat);
 	}
 
@@ -275,7 +275,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 		}
 	};
 
-	template<uint64_t size> inline static constexpr uint64_t getPackingSize() {
+	template<uint64_t size> inline static consteval uint64_t getPackingSize() {
 		if constexpr (size >= 64) {
 			return 64;
 		} else if constexpr (size >= 32) {
@@ -295,11 +295,11 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 
 	template<string_literal string>
 		requires(string.length == 0)
-	inline static constexpr auto packValues() {
+	inline static consteval auto packValues() {
 		return uint8_t{};
 	}
 
-	template<uint64_t length> static constexpr uint64_t get_int_length_v = []<uint64_t lengthNew> {
+	template<uint64_t length> alignas(64) inline constexpr uint64_t get_int_length_v = []<uint64_t lengthNew> {
 		if constexpr (lengthNew == 1ULL) {
 			return 1ULL;
 		} else if constexpr (lengthNew == 2ULL) {
@@ -318,7 +318,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 	template<auto string> struct pack_values;
 
 	template<gt_0_lte_8 auto string> struct pack_values<string> {
-		inline static constexpr decltype(auto) gen() {
+		inline static consteval decltype(auto) gen() {
 			using int_type = convert_length_to_int_t<string.length>;
 			int_type returnValues{};
 			for (uint64_t x = 0; x < string.length; ++x) {
@@ -335,7 +335,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 
 	template<gt_8 auto string> struct pack_values<string> {
 		using array_type = array<uint8_t, get_int_length_v<string.size()>>;
-		inline static constexpr array_type gen() {
+		inline static consteval array_type gen() {
 			array_type out_local{};
 			for (uint64_t i = 0; i < string.size(); ++i) {
 				out_local[i] = static_cast<uint8_t>(string[i]);
@@ -389,7 +389,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 		return sl;
 	}
 
-	inline static constexpr auto getOffsetIntoLiteralSize(uint64_t inputSize) noexcept {
+	inline static consteval auto getOffsetIntoLiteralSize(uint64_t inputSize) noexcept {
 		if (inputSize >= 64ULL && simdBytesPerRegister >= 64ULL) {
 			return 64ULL;
 		} else if (inputSize >= 32ULL && simdBytesPerRegister >= 32ULL) {

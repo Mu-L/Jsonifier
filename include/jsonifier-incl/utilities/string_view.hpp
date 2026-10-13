@@ -137,8 +137,8 @@ namespace jsonifier {
 		}
 
 		JSONIFIER_INLINE constexpr void swap(string_view_base& other) noexcept {
-			std::swap(dataVal, other.dataVal);
-			std::swap(sizeVal, other.sizeVal);
+			jsonifier::internal::swap(dataVal, other.dataVal);
+			jsonifier::internal::swap(sizeVal, other.sizeVal);
 		}
 
 		JSONIFIER_INLINE constexpr string_view_base(const_pointer pointerNew, const size_type countNew) noexcept : dataVal(pointerNew), sizeVal(countNew) {
@@ -176,7 +176,7 @@ namespace jsonifier {
 			return sizeVal;
 		}
 
-		JSONIFIER_INLINE constexpr string_view_base() noexcept : dataVal(), sizeVal(0) {
+		JSONIFIER_INLINE constexpr string_view_base() noexcept : dataVal{}, sizeVal{ 0 } {
 		}
 
 		JSONIFIER_INLINE constexpr bool empty() const noexcept {
@@ -193,7 +193,7 @@ namespace jsonifier {
 
 	using string_view = string_view_base;
 
-	template<size_t buffer_size>
+	template<uint64_t buffer_size>
 	JSONIFIER_INLINE static internal::basic_stream<buffer_size>& operator<<(internal::basic_stream<buffer_size>& os, const string_view& input) noexcept {
 		os << std::basic_string_view<char>{ input.data(), input.size() };
 		return os;

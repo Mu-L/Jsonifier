@@ -93,7 +93,7 @@ namespace jsonifier::internal {
 		return "Unknown Type";
 	}
 
-	template<printable_enum_types enum_type, size_t buffer_size>
+	template<printable_enum_types enum_type, uint64_t buffer_size>
 	JSONIFIER_INLINE static basic_stream<buffer_size>& operator<<(basic_stream<buffer_size>& os, enum_type type) noexcept {
 		os << getName(type).operator std::basic_string_view<char>();
 		return os;

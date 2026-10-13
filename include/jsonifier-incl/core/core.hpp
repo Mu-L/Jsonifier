@@ -31,7 +31,6 @@ namespace jsonifier::internal {
 			tupleRefsRaw[index].oldIndex = static_cast<uint8_t>(index);
 			const auto& potentialKey	 = internal::getBecauseOtherLibAuthorsResolve<index>(tuple);
 			if constexpr (has_name<decltype(potentialKey)>) {
-				// The hash map is matched against key text as it appears in the JSON, so build it from the escaped name.
 				tupleRefsRaw[index].key = escapedKeyLiteral<remove_cvref_t<decltype(potentialKey)>::name>.operator string_view();
 			}
 		}
@@ -41,7 +40,7 @@ namespace jsonifier::internal {
 		}
 	};
 
-	template<typename tuple_type> inline constexpr auto collectTupleRefs(const tuple_type& tuple) -> array<tuple_reference, tuple_size_v<remove_cvref_t<tuple_type>>> {
+	template<typename tuple_type> inline consteval auto collectTupleRefs(const tuple_type& tuple) -> array<tuple_reference, tuple_size_v<remove_cvref_t<tuple_type>>> {
 		constexpr auto tupleSize = tuple_size_v<remove_cvref_t<tuple_type>>;
 		array<tuple_reference, tupleSize> tupleRefsRaw{};
 		tuple_ref_collector<make_integer_sequence<tupleSize>>::impl(tuple, tupleRefsRaw);
@@ -49,7 +48,7 @@ namespace jsonifier::internal {
 	}
 
 	template<uint64_t size, typename comparator_type>
-	inline constexpr array<tuple_reference, size> sortTupleRefs(const array<tuple_reference, size>& tupleRefsRaw, comparator_type comparator) {
+	inline consteval array<tuple_reference, size> sortTupleRefs(const array<tuple_reference, size>& tupleRefsRaw, comparator_type comparator) {
 		array<tuple_reference, size> returnValues{ tupleRefsRaw };
 		for (uint64_t i = 1; i < size; ++i) {
 			auto key  = returnValues[i];
@@ -63,17 +62,17 @@ namespace jsonifier::internal {
 		return returnValues;
 	}
 
-	static constexpr auto byFirstByte = [](const tuple_reference& lhs, const tuple_reference& rhs) {
+	alignas(64) inline constexpr auto byFirstByte = [](const tuple_reference& lhs, const tuple_reference& rhs) {
 		const uint64_t lhsByte = lhs.key.size() ? static_cast<uint8_t>(lhs.key[0]) : 0ull;
 		const uint64_t rhsByte = rhs.key.size() ? static_cast<uint8_t>(rhs.key[0]) : 0ull;
 		return lhsByte < rhsByte;
 	};
 
-	static constexpr auto byLength = [](const tuple_reference& lhs, const tuple_reference& rhs) {
+	alignas(64) inline constexpr auto byLength = [](const tuple_reference& lhs, const tuple_reference& rhs) {
 		return lhs.key.size() < rhs.key.size();
 	};
 
-	template<uint64_t size> inline static constexpr tuple_references consolidateTupleRefs(const array<tuple_reference, size>& tupleRefsRaw) {
+	template<uint64_t size> inline static consteval tuple_references consolidateTupleRefs(const array<tuple_reference, size>& tupleRefsRaw) {
 		tuple_references returnValues{};
 		if constexpr (size > 0) {
 			returnValues.rootPtr = &tupleRefsRaw[0];
@@ -82,26 +81,26 @@ namespace jsonifier::internal {
 		return returnValues;
 	}
 
-	template<typename value_type> static constexpr auto tupleRefs{ collectTupleRefs(core<remove_cvref_t<value_type>>::parseValue) };
-	template<typename value_type> static constexpr auto tupleReferences{ consolidateTupleRefs(tupleRefs<value_type>) };
-	template<typename value_type> static constexpr auto sortedTupleReferencesByLength{ sortTupleRefs(tupleRefs<value_type>, byLength) };
-	template<typename value_type> static constexpr auto tupleReferencesByLength{ consolidateTupleRefs(sortedTupleReferencesByLength<value_type>) };
-	template<typename value_type> static constexpr auto sortedTupleReferencesByFirstByte{ sortTupleRefs(tupleRefs<value_type>, byFirstByte) };
-	template<typename value_type> static constexpr auto tupleReferencesByFirstByte{ consolidateTupleRefs(sortedTupleReferencesByFirstByte<value_type>) };
+	template<typename value_type> alignas(64) inline constexpr auto tupleRefs{ collectTupleRefs(core<remove_cvref_t<value_type>>::parseValue) };
+	template<typename value_type> alignas(64) inline constexpr auto tupleReferences{ consolidateTupleRefs(tupleRefs<value_type>) };
+	template<typename value_type> alignas(64) inline constexpr auto sortedTupleReferencesByLength{ sortTupleRefs(tupleRefs<value_type>, byLength) };
+	template<typename value_type> alignas(64) inline constexpr auto tupleReferencesByLength{ consolidateTupleRefs(sortedTupleReferencesByLength<value_type>) };
+	template<typename value_type> alignas(64) inline constexpr auto sortedTupleReferencesByFirstByte{ sortTupleRefs(tupleRefs<value_type>, byFirstByte) };
+	template<typename value_type> alignas(64) inline constexpr auto tupleReferencesByFirstByte{ consolidateTupleRefs(sortedTupleReferencesByFirstByte<value_type>) };
 
 	// Idea for this interface sampled from Stephen Berry and his library, Glaze library: https://github.com/stephenberry/glaze
-	template<typename value_type> using core_tuple_type					  = decltype(core<base_t<value_type>>::parseValue);
-	template<typename value_type> static constexpr uint64_t coreTupleSize = tuple_size_v<core_tuple_type<value_type>>;
+	template<typename value_type> using core_tuple_type								  = decltype(core<base_t<value_type>>::parseValue);
+	template<typename value_type> alignas(64) inline constexpr uint64_t coreTupleSize = tuple_size_v<core_tuple_type<value_type>>;
 
-	template<typename value_type> static constexpr bool leaf_parse_type =
+	template<typename value_type> alignas(64) inline constexpr bool leaf_parse_type =
 		string_t<value_type> || string_view_t<value_type> || bool_t<value_type> || number_t<value_type> || enum_t<value_type> || always_null_t<value_type>;
 
 #if JSONIFIER_COMPILER_MSVC
-	static constexpr uint64_t maxParseInlineMemberCount{ 8 };
+	alignas(64) inline constexpr uint64_t maxParseInlineMemberCount{ 8 };
 #elif (JSONIFIER_COMPILER_GCC || (JSONIFIER_COMPILER_CLANG && JSONIFIER_PLATFORM_MAC))
-	static constexpr uint64_t maxParseInlineMemberCount{ 64 };
+	alignas(64) inline constexpr uint64_t maxParseInlineMemberCount{ 64 };
 #else
-	static constexpr uint64_t maxParseInlineMemberCount{ 32 };
+	alignas(64) inline constexpr uint64_t maxParseInlineMemberCount{ 32 };
 #endif
 
 	template<typename value_type, uint64_t budget> consteval uint64_t parseMemberCount() noexcept;
@@ -154,4 +153,4 @@ namespace jsonifier::internal {
 		return parseMemberCount<base_t<value_type>, maxMemberCount>() <= maxMemberCount;
 	}
 
-}// namespace internal
+}

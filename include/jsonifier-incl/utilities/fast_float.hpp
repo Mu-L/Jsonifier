@@ -103,13 +103,6 @@
 
 static_assert(sizeof(void*) == 8, "jsonifier fast_float supports 64-bit platforms only");
 
-#define JSONIFIER_FASTFLOAT_TRY(x) \
-	{ \
-		if (!(x)) { \
-			return false; \
-		} \
-	}
-
 namespace jsonifier::internal {
 
 	template<uint_types v_type> JSONIFIER_INLINE bool is_digit(v_type value) {
@@ -125,13 +118,13 @@ namespace jsonifier::internal {
 	}
 
 	template<typename value_type> struct span {
-		JSONIFIER_INLINE constexpr span(const value_type* _ptr, const value_type* _end) noexcept : ptr(_ptr), end(_end) {
+		JSONIFIER_INLINE constexpr span(const value_type* _ptr, const value_type* _end) noexcept : ptr{ _ptr }, end{ _end } {
 		}
 
-		JSONIFIER_INLINE constexpr span(const value_type* _ptr) noexcept : ptr(_ptr), end(nullptr) {
+		JSONIFIER_INLINE constexpr span(const value_type* _ptr) noexcept : ptr{ _ptr }, end{ nullptr } {
 		}
 
-		JSONIFIER_INLINE constexpr span() noexcept : ptr(nullptr), end(nullptr) {
+		JSONIFIER_INLINE constexpr span() noexcept : ptr{ nullptr }, end{ nullptr } {
 		}
 
 		const value_type* ptr;
@@ -139,10 +132,10 @@ namespace jsonifier::internal {
 	};
 
 	struct value128 {
-		JSONIFIER_INLINE constexpr value128(uint64_t _low, uint64_t _high) noexcept : high(_high), low(_low) {
+		JSONIFIER_INLINE constexpr value128(uint64_t _low, uint64_t _high) noexcept : high{ _high }, low{ _low } {
 		}
 
-		JSONIFIER_INLINE constexpr value128() noexcept : high(0), low(0) {
+		JSONIFIER_INLINE constexpr value128() noexcept : high{ 0 }, low{ 0 } {
 		}
 
 		uint64_t high;
@@ -196,9 +189,9 @@ namespace jsonifier::internal {
 		int32_t power2;
 	};
 
-	static constexpr int32_t invalid_am_bias = -0x8000;
+	alignas(64) inline constexpr int32_t invalid_am_bias = -0x8000;
 
-	constexpr uint64_t constant_55555 = 5 * 5 * 5 * 5 * 5;
+	alignas(64) inline constexpr uint64_t constant_55555 = 5 * 5 * 5 * 5 * 5;
 
 	template<typename value_type, typename U = void> struct binary_format_lookup_tables;
 
@@ -265,10 +258,10 @@ namespace jsonifier::internal {
 		value = std::bit_cast<value_type>(word);
 	}
 
-	template<typename char_t> static constexpr uint64_t int_cmp_zeros{ (sizeof(char_t) == 1) ? 0x3030303030303030
+	template<typename char_t> alignas(64) inline constexpr uint64_t int_cmp_zeros{ (sizeof(char_t) == 1) ? 0x3030303030303030
 			: (sizeof(char_t) == 2) ? (static_cast<uint64_t>(char_t('0')) << 48 | static_cast<uint64_t>(char_t('0')) << 32 | static_cast<uint64_t>(char_t('0')) << 16 | char_t('0'))
 									: (static_cast<uint64_t>(char_t('0')) << 32 | char_t('0')) };
-	template<typename char_t> static constexpr int32_t int_cmp_len{ sizeof(uint64_t) / sizeof(char_t) };
+	template<typename char_t> alignas(64) inline constexpr int32_t int_cmp_len{ sizeof(uint64_t) / sizeof(char_t) };
 
 	template<typename = void> struct int_luts {
 		alignas(64) static constexpr uint8_t chdigit[]{ 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -619,9 +612,9 @@ namespace jsonifier::internal {
 		return answer;
 	}
 
-	typedef uint64_t limb;
-	constexpr uint64_t limb_bits	   = 64;
-	constexpr uint64_t limb_bits_sub_1 = limb_bits - 1;
+	using limb											  = uint64_t;
+	alignas(64) inline constexpr uint64_t limb_bits		  = 64;
+	alignas(64) inline constexpr uint64_t limb_bits_sub_1 = limb_bits - 1;
 
 	template<uint_types auto n> static consteval auto getPowerOfTwo() {
 		static_assert(n > 0, "Value must be greater than zero.");
@@ -631,12 +624,12 @@ namespace jsonifier::internal {
 		return static_cast<uint64_t>(std::countr_zero(static_cast<std::make_unsigned_t<value_type>>(n)));
 	}
 
-	constexpr uint64_t limb_bits_pow_2 = getPowerOfTwo<limb_bits>();
+	alignas(64) inline constexpr uint64_t limb_bits_pow_2 = getPowerOfTwo<limb_bits>();
 
-	typedef span<limb> limb_span;
+	using limb_span = span<limb>;
 
-	constexpr uint64_t bigint_bits	= 4000;
-	constexpr uint64_t bigint_limbs = bigint_bits / limb_bits;
+	alignas(64) inline constexpr uint64_t bigint_bits  = 4000;
+	alignas(64) inline constexpr uint64_t bigint_limbs = bigint_bits / limb_bits;
 
 	template<uint16_t sizeNew> struct stackvec {
 		static constexpr uint16_t size{ sizeNew };

@@ -12,7 +12,7 @@
 
 namespace JSONIFIER_INTERNAL_NAMESPACE {
 
-	constexpr array<json_structural_type, 256ULL> genJsonTypes() {
+	consteval array<json_structural_type, 256ULL> genJsonTypes() {
 		array<json_structural_type, 256ULL> returnValues{};
 		using enum json_structural_type;
 		returnValues[static_cast<uint64_t>('"')] = string;
@@ -39,10 +39,9 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 		return returnValues;
 	}
 
-	alignas(64) inline constexpr const json_structural_type* __restrict jsonTypes{ []() constexpr {
-		constexpr auto local{ genJsonTypes() };
-		return make_static<local>::value.data();
-	}() };
+	alignas(64) inline constexpr auto jsonTypesRaw{ genJsonTypes() };
+
+	alignas(64) inline constexpr const json_structural_type* __restrict jsonTypes{ jsonTypesRaw.data() };
 
 	template<typename minifier_type> struct minify_context_ro {
 		inline minify_context_ro(minifier_type& minifierNew, write_structural_index_ptr iterNew, write_structural_index_ptr endStructuralNew, read_buffer_ptr rootIterNew,
@@ -118,7 +117,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 			while (iter < endStructural) {
 				previousPtr = rootIter + *iter;
 				++iter;
-				switch (static_cast<uint64_t>(jsonTypes[static_cast<uint8_t>(*previousPtr)])) {
+				switch (static_cast<uint64_t>(jsonTypes[static_cast<uint64_t>(*previousPtr)])) {
 					case static_cast<uint64_t>(string): {
 						backTrackWs(currentDistance, previousPtr, iter, rootIter);
 						if (currentDistance > 0) [[likely]] {
@@ -138,7 +137,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 					}
 					case static_cast<uint64_t>(number): {
 						currentDistance = 0;
-						while (!whitespaceTable[static_cast<uint8_t>(previousPtr[++currentDistance])] && ((previousPtr + currentDistance) < (rootIter + *iter))) {
+						while (!whitespaceTable[static_cast<uint64_t>(previousPtr[++currentDistance])] && ((previousPtr + currentDistance) < (rootIter + *iter))) {
 						}
 						jsonifierMemcpy(&outBuffer[index], previousPtr, static_cast<uint64_t>(currentDistance));
 						index += static_cast<uint64_t>(currentDistance);
@@ -232,11 +231,11 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 		}
 
 		JSONIFIER_INLINE void skipWs(int64_t& currentDistance, read_buffer_ptr previousPtr) noexcept {
-			while (whitespaceTable[static_cast<uint8_t>(previousPtr[--currentDistance])]) {
+			while (whitespaceTable[static_cast<uint64_t>(previousPtr[--currentDistance])]) {
 			}
 		}
 	};
 
-}// namespace internal
+}
 
 #endif

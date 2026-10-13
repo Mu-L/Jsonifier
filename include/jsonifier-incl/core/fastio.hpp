@@ -10,11 +10,11 @@ namespace jsonifier::internal {
 
 	enum class stream_target { stdout_target, stderr_target };
 
-	inline size_t rawWrite(stream_target target, const char* data, size_t len) {
+	inline uint64_t rawWrite(stream_target target, const char* data, uint64_t len) {
 #if JSONIFIER_PLATFORM_WINDOWS
-		HANDLE handle = GetStdHandle(target == stream_target::stdout_target ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE);
-		DWORD written = 0;
-		size_t total  = 0;
+		HANDLE handle  = GetStdHandle(target == stream_target::stdout_target ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE);
+		DWORD written  = 0;
+		uint64_t total = 0;
 		while (total < len) {
 			DWORD chunk = static_cast<DWORD>(len - total);
 			if (!WriteFile(handle, data + total, chunk, &written, nullptr)) {
@@ -27,24 +27,25 @@ namespace jsonifier::internal {
 		}
 		return total;
 #else
-		int fd		 = target == stream_target::stdout_target ? 1 : 2;
-		size_t total = 0;
+		int32_t fd	   = target == stream_target::stdout_target ? 1 : 2;
+		uint64_t total = 0;
 		while (total < len) {
 			ssize_t result = write(fd, data + total, len - total);
 			if (result <= 0) {
 				break;
 			}
-			total += static_cast<size_t>(result);
+			total += static_cast<uint64_t>(result);
 		}
 		return total;
 #endif
 	}
 
-	static constexpr uint8_t digitCounts[]{ 19, 19, 19, 19, 18, 18, 18, 17, 17, 17, 16, 16, 16, 16, 15, 15, 15, 14, 14, 14, 13, 13, 13, 13, 12, 12, 12, 11, 11, 11, 10, 10, 10, 10,
-		9, 9, 9, 8, 8, 8, 7, 7, 7, 7, 6, 6, 6, 5, 5, 5, 4, 4, 4, 4, 3, 3, 3, 2, 2, 2, 1, 1, 1, 1, 1 };
+	alignas(64) inline constexpr uint8_t digitCounts[]{ 19, 19, 19, 19, 18, 18, 18, 17, 17, 17, 16, 16, 16, 16, 15, 15, 15, 14, 14, 14, 13, 13, 13, 13, 12, 12, 12, 11, 11, 11, 10,
+		10, 10, 10, 9, 9, 9, 8, 8, 8, 7, 7, 7, 7, 6, 6, 6, 5, 5, 5, 4, 4, 4, 4, 3, 3, 3, 2, 2, 2, 1, 1, 1, 1, 1 };
 
-	static constexpr uint64_t digitCountThresholds[]{ 0ULL, 9ULL, 99ULL, 999ULL, 9999ULL, 99999ULL, 999999ULL, 9999999ULL, 99999999ULL, 999999999ULL, 9999999999ULL, 99999999999ULL,
-		999999999999ULL, 9999999999999ULL, 99999999999999ULL, 999999999999999ULL, 9999999999999999ULL, 99999999999999999ULL, 999999999999999999ULL, 9999999999999999999ULL };
+	alignas(64) inline constexpr uint64_t digitCountThresholds[]{ 0ULL, 9ULL, 99ULL, 999ULL, 9999ULL, 99999ULL, 999999ULL, 9999999ULL, 99999999ULL, 999999999ULL, 9999999999ULL,
+		99999999999ULL, 999999999999ULL, 9999999999999ULL, 99999999999999ULL, 999999999999999ULL, 9999999999999999ULL, 99999999999999999ULL, 999999999999999999ULL,
+		9999999999999999999ULL };
 
 	inline static uint64_t fastDigitCount(const uint64_t inputValue) {
 		const uint64_t originalDigitCount{ digitCounts[std::countl_zero(inputValue)] };
@@ -75,7 +76,7 @@ namespace jsonifier::internal {
 		return pos;
 	}
 
-	template<typename value_type> inline size_t writeInteger(char* dest, value_type value) {
+	template<typename value_type> inline uint64_t writeInteger(char* dest, value_type value) {
 		if constexpr (std::is_signed_v<value_type>) {
 			uint64_t magnitude;
 			char* out_local = dest;
@@ -88,7 +89,7 @@ namespace jsonifier::internal {
 			auto count = fastDigitCount(magnitude);
 			char* end  = out_local + count;
 			writeUnsigned(end, magnitude);
-			return static_cast<size_t>(end - dest);
+			return static_cast<uint64_t>(end - dest);
 		} else {
 			uint64_t magnitude = static_cast<uint64_t>(value);
 			auto count		   = fastDigitCount(magnitude);
@@ -98,18 +99,18 @@ namespace jsonifier::internal {
 		}
 	}
 
-	template<typename value_type> inline size_t writeFloat(char* dest, value_type value) {
+	template<typename value_type> inline uint64_t writeFloat(char* dest, value_type value) {
 		auto result = std::to_chars(dest, dest + 64, value);
-		return static_cast<size_t>(result.ptr - dest);
+		return static_cast<uint64_t>(result.ptr - dest);
 	}
 
 	struct endl_t {};
-	inline constexpr endl_t endl{};
+	alignas(64) inline constexpr endl_t endl{};
 
 	struct flush_t {};
-	inline constexpr flush_t flush{};
+	alignas(64) inline constexpr flush_t flush{};
 
-	template<size_t buffer_size = 8192> struct basic_stream {
+	template<uint64_t buffer_size = 8192> struct basic_stream {
 		template<typename integer_type>
 		inline std::enable_if_t<std::is_integral_v<integer_type> && !std::is_same_v<integer_type, char> && !std::is_same_v<integer_type, bool>, basic_stream&> operator<<(
 			integer_type value) {
@@ -118,7 +119,7 @@ namespace jsonifier::internal {
 			return *this;
 		}
 
-		inline void writeRaw(const char* data, size_t size) {
+		inline void writeRaw(const char* data, uint64_t size) {
 			if (size >= buffer_size) {
 				doFlush();
 				rawWrite(target_, data, size);
@@ -161,13 +162,13 @@ namespace jsonifier::internal {
 			}
 		}
 
-		inline void ensureSpace(size_t needed) {
+		inline void ensureSpace(uint64_t needed) {
 			if (len_ + needed > buffer_size) {
 				doFlush();
 			}
 		}
 
-		inline explicit basic_stream(stream_target target) : target_(target), len_(0) {
+		inline explicit basic_stream(stream_target target) : target_{ target }, len_{ 0 } {
 		}
 
 		inline basic_stream& operator<<(endl_t) {
@@ -201,7 +202,7 @@ namespace jsonifier::internal {
 
 		char buffer_[buffer_size];
 		stream_target target_;
-		size_t len_;
+		uint64_t len_;
 	};
 
 #if JSONIFIER_COMPILER_CLANG
@@ -210,7 +211,7 @@ namespace jsonifier::internal {
 	#pragma clang diagnostic ignored "-Wglobal-constructors"
 #endif
 
-	inline static basic_stream<> out{ stream_target::stdout_target };
+	inline static basic_stream<> cout{ stream_target::stdout_target };
 
 	inline static basic_stream<> err{ stream_target::stderr_target };
 

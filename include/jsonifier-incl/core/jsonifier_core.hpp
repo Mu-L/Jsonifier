@@ -167,21 +167,14 @@ namespace jsonifier {
 
 		using first_core = typename core_at_impl<0, cores...>::type;
 
+#if JSONIFIER_COMPILER_CLANG
+	#pragma clang diagnostic push
+	#pragma clang diagnostic ignored "-Wglobal-constructors"
+#endif
 		inline static const jsonifier_backend hotBackend{ selectBackend() };
-
-		template<typename functor_type> JSONIFIER_INLINE decltype(auto) dispatch(functor_type&& functor) noexcept {
-			if (hotBackend == first_core::backendType) [[likely]] {
-				return functor(static_cast<first_core&>(*this));
-			}
-			return dispatchCold(functor);
-		}
-
-		template<typename functor_type> JSONIFIER_NOINLINE auto dispatchCold(functor_type& functor) noexcept {
-			decltype(functor(static_cast<first_core&>(*this))) result{};
-			static const jsonifier_backend backend{ selectedBackend() };
-			static_cast<void>(((backend == cores::backendType && (result = functor(static_cast<cores&>(*this)), true)) || ...));
-			return result;
-		}
+#if JSONIFIER_COMPILER_CLANG
+	#pragma clang diagnostic pop
+#endif
 
 		static inline const char* activeBackendName() noexcept {
 			const char* result{ cpu_arch_name };
@@ -192,23 +185,35 @@ namespace jsonifier {
 
 		template<parse_options options = parse_options{}, internal::string_t value_type, typename buffer_type>
 		JSONIFIER_INLINE bool parseJson(value_type&& object, const buffer_type& in) noexcept {
-			return dispatch([&](auto& core) {
-				return core.template parseJson<options>(internal::forward<value_type>(object), in);
-			});
+			if (hotBackend == first_core::backendType) [[likely]] {
+				return first_core::template parseJson<options>(internal::forward<value_type>(object), in);
+			}
+			bool result{};
+			static const jsonifier_backend backend{ selectedBackend() };
+			static_cast<void>(((backend == cores::backendType && (result = cores::template parseJson<options>(internal::forward<value_type>(object), in), true)) || ...));
+			return result;
 		}
 
 		template<parse_options options = parse_options{}, internal::bool_t value_type, typename buffer_type>
 		JSONIFIER_INLINE bool parseJson(value_type&& object, const buffer_type& in) noexcept {
-			return dispatch([&](auto& core) {
-				return core.template parseJson<options>(internal::forward<value_type>(object), in);
-			});
+			if (hotBackend == first_core::backendType) [[likely]] {
+				return first_core::template parseJson<options>(internal::forward<value_type>(object), in);
+			}
+			bool result{};
+			static const jsonifier_backend backend{ selectedBackend() };
+			static_cast<void>(((backend == cores::backendType && (result = cores::template parseJson<options>(internal::forward<value_type>(object), in), true)) || ...));
+			return result;
 		}
 
 		template<parse_options options = parse_options{}, internal::number_t value_type, typename buffer_type>
 		JSONIFIER_INLINE bool parseJson(value_type&& object, const buffer_type& in) noexcept {
-			return dispatch([&](auto& core) {
-				return core.template parseJson<options>(internal::forward<value_type>(object), in);
-			});
+			if (hotBackend == first_core::backendType) [[likely]] {
+				return first_core::template parseJson<options>(internal::forward<value_type>(object), in);
+			}
+			bool result{};
+			static const jsonifier_backend backend{ selectedBackend() };
+			static_cast<void>(((backend == cores::backendType && (result = cores::template parseJson<options>(internal::forward<value_type>(object), in), true)) || ...));
+			return result;
 		}
 
 		template<parse_options options = parse_options{}, typename value_type, typename buffer_type> inline bool parseJson(value_type&& object, const buffer_type& in) noexcept {
@@ -220,9 +225,14 @@ namespace jsonifier {
 
 		template<parse_options options = parse_options{}, typename comparison_type, typename buffer_type>
 		inline bool parseJsonForComparison(comparison_type&& object, const buffer_type& in) noexcept {
-			return dispatch([&](auto& core) {
-				return core.template parseJsonForComparison<options>(internal::forward<comparison_type>(object), in);
-			});
+			if (hotBackend == first_core::backendType) [[likely]] {
+				return first_core::template parseJsonForComparison<options>(internal::forward<comparison_type>(object), in);
+			}
+			bool result{};
+			static const jsonifier_backend backend{ selectedBackend() };
+			static_cast<void>(
+				((backend == cores::backendType && (result = cores::template parseJsonForComparison<options>(internal::forward<comparison_type>(object), in), true)) || ...));
+			return result;
 		}
 
 		template<serialize_options options = serialize_options{}, internal::number_t value_type, internal::buffer_like buffer_type>
@@ -262,15 +272,23 @@ namespace jsonifier {
 		}
 
 		template<parse_options options = parse_options{}, typename buffer_type> inline auto collectStructurals(buffer_type&& in) noexcept {
-			return dispatch([&](auto& core) {
-				return core.template collectStructurals<options>(internal::forward<buffer_type>(in));
-			});
+			if (hotBackend == first_core::backendType) [[likely]] {
+				return first_core::template collectStructurals<options>(internal::forward<buffer_type>(in));
+			}
+			decltype(first_core::template collectStructurals<options>(internal::forward<buffer_type>(in))) result{};
+			static const jsonifier_backend backend{ selectedBackend() };
+			static_cast<void>(((backend == cores::backendType && (result = cores::template collectStructurals<options>(internal::forward<buffer_type>(in)), true)) || ...));
+			return result;
 		}
 
 		template<parse_options options = parse_options{}, typename buffer_type> inline auto collectStructuralsSingle(buffer_type&& in) noexcept {
-			return dispatch([&](auto& core) {
-				return core.template collectStructuralsSingle<options>(internal::forward<buffer_type>(in));
-			});
+			if (hotBackend == first_core::backendType) [[likely]] {
+				return first_core::template collectStructuralsSingle<options>(internal::forward<buffer_type>(in));
+			}
+			decltype(first_core::template collectStructuralsSingle<options>(internal::forward<buffer_type>(in))) result{};
+			static const jsonifier_backend backend{ selectedBackend() };
+			static_cast<void>(((backend == cores::backendType && (result = cores::template collectStructuralsSingle<options>(internal::forward<buffer_type>(in)), true)) || ...));
+			return result;
 		}
 
 		template<typename string_type> inline bool validateJson(string_type&& in) noexcept {

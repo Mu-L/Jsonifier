@@ -36,9 +36,9 @@ namespace jsonifier::internal {
 	template<typename value_type> using remove_class_pointer_t = typename remove_class_pointer<value_type>::type;
 
 #if JSONIFIER_COMPILER_CLANG
-	constexpr auto pretty_function_tail = "]";
+	alignas(64) inline constexpr auto pretty_function_tail = "]";
 #elif JSONIFIER_COMPILER_GCC
-	constexpr auto pretty_function_tail = ";";
+	alignas(64) inline constexpr auto pretty_function_tail = ";";
 #endif
 
 #if JSONIFIER_COMPILER_MSVC
@@ -58,7 +58,7 @@ namespace jsonifier::internal {
 
 	template<auto p>
 		requires(std::is_member_pointer_v<decltype(p)>)
-	inline static constexpr string_view getName() noexcept {
+	inline static consteval string_view getName() noexcept {
 #if JSONIFIER_COMPILER_MSVC
 		using value_type		 = remove_member_pointer_t<decltype(p)>;
 		constexpr auto pNew		 = p;

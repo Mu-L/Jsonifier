@@ -175,7 +175,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 					return false;
 				}
 				if constexpr (!options.minified) {
-					while (rootIter < endIter && whitespaceTable[static_cast<uint8_t>(*rootIter)]) {
+					while (rootIter < endIter && whitespaceTable[static_cast<uint64_t>(*rootIter)]) {
 						++rootIter;
 					}
 				}
@@ -405,7 +405,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 
 		template<bool minified> JSONIFIER_INLINE bool finish(auto* rootIter, auto* iterNew, const auto* endIter) noexcept {
 			if constexpr (!minified) {
-				while (iterNew < endIter && whitespaceTable[static_cast<uint8_t>(*iterNew)]) {
+				while (iterNew < endIter && whitespaceTable[static_cast<uint64_t>(*iterNew)]) {
 					++iterNew;
 				}
 			}

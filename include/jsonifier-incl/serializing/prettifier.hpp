@@ -120,7 +120,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 			read_buffer_ptr newPtr{};
 			prettify_status status{};
 			while (iter < endStructural) {
-				switch (static_cast<uint64_t>(jsonTypes[static_cast<uint8_t>(stringRootIter[*iter])])) {
+				switch (static_cast<uint64_t>(jsonTypes[static_cast<uint64_t>(stringRootIter[*iter])])) {
 					case static_cast<uint64_t>(string): {
 						newPtr = stringRootIter + *iter;
 						++iter;
@@ -275,6 +275,6 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 		}
 	};
 
-}// namespace internal
+}
 
 #endif

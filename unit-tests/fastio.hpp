@@ -16,7 +16,7 @@ namespace fastio_tests {
 
 	struct stream_capture {
 		explicit stream_capture(jsonifier::internal::stream_target target) : target_{ target } {
-			jsonifier::internal::out.flushNow();
+			jsonifier::internal::cout.flushNow();
 			jsonifier::internal::err.flushNow();
 			tempPath			= (std::filesystem::temp_directory_path() / "jsonifier_fastio_capture.tmp").string();
 			const bool isStdout = target_ == jsonifier::internal::stream_target::stdout_target;
@@ -25,9 +25,9 @@ namespace fastio_tests {
 			fileHandle	= CreateFileA(tempPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 			SetStdHandle(isStdout ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE, fileHandle);
 #else
-			fdNumber  = isStdout ? 1 : 2;
-			savedFd	  = dup(fdNumber);
-			int newFd = open(tempPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+			fdNumber	  = isStdout ? 1 : 2;
+			savedFd		  = dup(fdNumber);
+			int32_t newFd = open(tempPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
 			dup2(newFd, fdNumber);
 			close(newFd);
 #endif
@@ -35,7 +35,7 @@ namespace fastio_tests {
 
 		std::string finish() {
 			if (target_ == jsonifier::internal::stream_target::stdout_target) {
-				jsonifier::internal::out.flushNow();
+				jsonifier::internal::cout.flushNow();
 			} else {
 				jsonifier::internal::err.flushNow();
 			}
@@ -58,8 +58,8 @@ namespace fastio_tests {
 		HANDLE savedHandle{};
 		HANDLE fileHandle{};
 #else
-		int fdNumber{};
-		int savedFd{};
+		int32_t fdNumber{};
+		int32_t savedFd{};
 #endif
 	};
 
@@ -71,7 +71,7 @@ namespace fastio_tests {
 		std::cout << "fastio Digit-Count Tests: " << std::endl;
 		for (auto value: digitCountBoundaries) {
 			rt_ut::unit_test<"fastio_digit_count_matches_decimal_length", true>::assert_eq(std::to_string(value).size(), [&]() {
-				return static_cast<std::size_t>(jsonifier::internal::fastDigitCount(value));
+				return static_cast<uint64_t>(jsonifier::internal::fastDigitCount(value));
 			});
 		}
 		std::cout << "fastio Digit-Count tests complete." << std::endl;
@@ -124,7 +124,7 @@ namespace fastio_tests {
 
 			char expectedBuffer[64]{};
 			auto expectedResult = std::to_chars(expectedBuffer, expectedBuffer + 64, value);
-			std::string expected{ expectedBuffer, static_cast<std::size_t>(expectedResult.ptr - expectedBuffer) };
+			std::string expected{ expectedBuffer, static_cast<uint64_t>(expectedResult.ptr - expectedBuffer) };
 
 			rt_ut::unit_test<"fastio_write_float_matches_to_chars", true>::assert_eq(expected, [&]() {
 				return result;
@@ -164,7 +164,7 @@ namespace fastio_tests {
 
 	inline static void outSingletonWritesToStdoutTest() {
 		stream_capture capture{ jsonifier::internal::stream_target::stdout_target };
-		jsonifier::internal::out << "out-singleton-check " << 123;
+		jsonifier::internal::cout << "out-singleton-check " << 123;
 		std::string captured = capture.finish();
 		rt_ut::unit_test<"fastio_out_singleton_writes_to_stdout", true>::assert_eq(std::string{ "out-singleton-check 123" }, [&]() {
 			return captured;

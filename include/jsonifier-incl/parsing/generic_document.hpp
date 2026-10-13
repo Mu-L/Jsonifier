@@ -14,7 +14,7 @@
 
 namespace jsonifier::generic {
 
-	static constexpr uint64_t defaultBatchSize{ 1024 * 1024 };
+	alignas(64) inline constexpr uint64_t defaultBatchSize{ 1024 * 1024 };
 
 	template<uint64_t initialBufferSize = 1024 * 1024> class parser;
 
@@ -470,46 +470,58 @@ namespace jsonifier::generic {
 
 	using array_type_table = internal::array<json_type, 256>;
 
-	alignas(64) inline constexpr auto utf8StringStopTable{ [] {
-		internal::array<bool, 256> table{};
+	consteval internal::array<bool, 256ULL> genUtf8StringStopTable() {
+		internal::array<bool, 256ULL> returnValues{};
 		for (uint64_t x = 0; x < 0x20; ++x) {
-			table[x] = true;
+			returnValues[x] = true;
 		}
-		table[static_cast<uint8_t>('"')]  = true;
-		table[static_cast<uint8_t>('\\')] = true;
-		return table;
-	}() };
+		returnValues[static_cast<uint64_t>('"')]  = true;
+		returnValues[static_cast<uint64_t>('\\')] = true;
+		return returnValues;
+	}
 
-	alignas(64) inline constexpr auto asciiStringStopTable{ [] {
-		internal::array<bool, 256> table{};
+	alignas(64) inline constexpr auto utf8StringStopTableRaw{ genUtf8StringStopTable() };
+
+	alignas(64) inline constexpr const bool* __restrict utf8StringStopTable{ utf8StringStopTableRaw.data() };
+
+	consteval internal::array<bool, 256ULL> genAsciiStringStopTable() {
+		internal::array<bool, 256ULL> returnValues{};
 		for (uint64_t x = 0; x < 0x20; ++x) {
-			table[x] = true;
+			returnValues[x] = true;
 		}
 		for (uint64_t x = 0x80; x < 0x100; ++x) {
-			table[x] = true;
+			returnValues[x] = true;
 		}
-		table[static_cast<uint8_t>('"')]  = true;
-		table[static_cast<uint8_t>('\\')] = true;
-		return table;
-	}() };
+		returnValues[static_cast<uint64_t>('"')]  = true;
+		returnValues[static_cast<uint64_t>('\\')] = true;
+		return returnValues;
+	}
 
-	alignas(64) inline constexpr auto typeTable{ [] {
-		array_type_table table{};
-		for (auto& entry: table) {
+	alignas(64) inline constexpr auto asciiStringStopTableRaw{ genAsciiStringStopTable() };
+
+	alignas(64) inline constexpr const bool* __restrict asciiStringStopTable{ asciiStringStopTableRaw.data() };
+
+	consteval array_type_table genTypeTable() {
+		array_type_table returnValues{};
+		for (auto& entry: returnValues) {
 			entry = json_type::unset;
 		}
-		table[static_cast<uint8_t>('{')] = json_type::object;
-		table[static_cast<uint8_t>('[')] = json_type::array;
-		table[static_cast<uint8_t>('"')] = json_type::string;
-		table[static_cast<uint8_t>('t')] = json_type::boolean;
-		table[static_cast<uint8_t>('f')] = json_type::boolean;
-		table[static_cast<uint8_t>('n')] = json_type::null;
-		table[static_cast<uint8_t>('-')] = json_type::number;
-		for (uint8_t digit = '0'; digit <= '9'; ++digit) {
-			table[digit] = json_type::number;
+		returnValues[static_cast<uint64_t>('{')] = json_type::object;
+		returnValues[static_cast<uint64_t>('[')] = json_type::array;
+		returnValues[static_cast<uint64_t>('"')] = json_type::string;
+		returnValues[static_cast<uint64_t>('t')] = json_type::boolean;
+		returnValues[static_cast<uint64_t>('f')] = json_type::boolean;
+		returnValues[static_cast<uint64_t>('n')] = json_type::null;
+		returnValues[static_cast<uint64_t>('-')] = json_type::number;
+		for (uint64_t x = static_cast<uint64_t>('0'); x <= static_cast<uint64_t>('9'); ++x) {
+			returnValues[x] = json_type::number;
 		}
-		return table;
-	}() };
+		return returnValues;
+	}
+
+	alignas(64) inline constexpr auto typeTableRaw{ genTypeTable() };
+
+	alignas(64) inline constexpr const json_type* __restrict typeTable{ typeTableRaw.data() };
 
 	class object;
 	class array;
@@ -850,7 +862,7 @@ namespace jsonifier::generic {
 					return false;
 				}
 			}
-			return valueStart + atomSize == doc->end || internal::validPostPrimitiveTable[static_cast<uint8_t>(valueStart[atomSize])];
+			return valueStart + atomSize == doc->end || internal::validPostPrimitiveTable[static_cast<uint64_t>(valueStart[atomSize])];
 		}
 
 		JSONIFIER_INLINE bool trueMatches() const noexcept {
@@ -882,7 +894,7 @@ namespace jsonifier::generic {
 		}
 
 		JSONIFIER_INLINE static error_code finishNumber(read_buffer_ptr parsedEnd, read_buffer_ptr valueEnd) noexcept {
-			if (parsedEnd && (parsedEnd == valueEnd || internal::validPostPrimitiveTable[static_cast<uint8_t>(*parsedEnd)])) [[likely]] {
+			if (parsedEnd && (parsedEnd == valueEnd || internal::validPostPrimitiveTable[static_cast<uint64_t>(*parsedEnd)])) [[likely]] {
 				return error_code::success;
 			}
 			return error_code::number_error;
@@ -1576,7 +1588,7 @@ namespace jsonifier::generic {
 				return stream->current();
 			}
 
-			JSONIFIER_INLINE void operator++(int) noexcept {
+			JSONIFIER_INLINE void operator++(int32_t) noexcept {
 				stream->advance();
 			}
 

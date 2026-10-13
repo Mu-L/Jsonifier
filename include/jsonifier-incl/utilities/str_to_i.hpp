@@ -13,15 +13,11 @@
 #if JSONIFIER_COMPILER_MSVC
 
 
-	#if !defined(JSONIFIER_IS_DIGIT)
-		#define JSONIFIER_IS_DIGIT(x) ((static_cast<uint8_t>(x - '0')) < 10)
-	#endif
-
 namespace jsonifier::internal {
 
-	static constexpr char zero{ '0' };
+	alignas(64) inline constexpr char zero{ '0' };
 
-	template<bool negative> static constexpr uint64_t compValAddition{ [] {
+	template<bool negative> alignas(64) inline constexpr uint64_t compValAddition{ [] {
 		if constexpr (negative) {
 			return 1ULL;
 		} else {
@@ -29,7 +25,7 @@ namespace jsonifier::internal {
 		}
 	}() };
 
-	template<typename v_type, bool negative> constexpr array<std::make_unsigned_t<v_type>, 256ULL> genRawCompVals() {
+	template<typename v_type, bool negative> consteval array<std::make_unsigned_t<v_type>, 256ULL> genRawCompVals() {
 		constexpr auto max_value{ static_cast<std::make_unsigned_t<v_type>>(std::numeric_limits<std::remove_cvref_t<v_type>>::max()) + compValAddition<negative> };
 		array<std::make_unsigned_t<v_type>, 256ULL> returnValues{};
 		returnValues[static_cast<uint64_t>('0')] = (max_value - 0) / 10;
@@ -45,10 +41,9 @@ namespace jsonifier::internal {
 		return returnValues;
 	}
 
-	template<typename v_type, bool negative> alignas(64) inline constexpr const std::make_unsigned_t<v_type>* __restrict compVals{ []() constexpr {
-		constexpr auto local{ genRawCompVals<v_type, negative>() };
-		return make_static<local>::value.data();
-	}() };
+	template<typename v_type, bool negative> alignas(64) inline constexpr auto compValsRaw{ genRawCompVals<v_type, negative>() };
+
+	template<typename v_type, bool negative> alignas(64) inline constexpr const std::make_unsigned_t<v_type>* __restrict compVals{ compValsRaw<v_type, negative>.data() };
 
 	JSONIFIER_INLINE static uint8_t peekByte(const uint8_t* iter, const uint8_t* end) noexcept {
 		return iter < end ? *iter : uint8_t{ 0 };
@@ -62,26 +57,37 @@ namespace jsonifier::internal {
 		}
 	}
 
-	static constexpr ptrdiff_t uncheckedIntegerSpan{ 21 };
+	alignas(64) inline constexpr ptrdiff_t uncheckedIntegerSpan{ 21 };
 
-	static constexpr int64_t maxFractionDigits{ 18 };
+	alignas(64) inline constexpr int64_t maxFractionDigits{ 18 };
 
-	static constexpr int64_t maxUnsignedFractionDigits{ 19 };
+	alignas(64) inline constexpr int64_t maxUnsignedFractionDigits{ 19 };
 
-	static constexpr int64_t maxExponentValue{ 20 };
+	alignas(64) inline constexpr int64_t maxExponentValue{ 20 };
 
-	template<typename = void> struct pow_tables {
-		alignas(64) static constexpr uint64_t powerOfTenUint[]{ 1ull, 10ull, 100ull, 1000ull, 10000ull, 100000ull, 1000000ull, 10000000ull, 100000000ull, 1000000000ull,
-			10000000000ull, 100000000000ull, 1000000000000ull, 10000000000000ull, 100000000000000ull, 1000000000000000ull, 10000000000000000ull, 100000000000000000ull,
-			1000000000000000000ull, 10000000000000000000ull };
+	template<typename T, size_t N> consteval array<T, N> generatePowerOfTen() noexcept {
+		array<T, N> table{};
+		T val = 1;
+		for (size_t i = 0; i < N; ++i) {
+			table[i] = val;
+			if (i + 1 < N) {
+				val *= 10;
+			}
+		}
+		return table;
+	}
 
-		alignas(64) static constexpr int64_t powerOfTenInt[]{ 1ll, 10ll, 100ll, 1000ll, 10000ll, 100000ll, 1000000ll, 10000000ll, 100000000ll, 1000000000ll, 10000000000ll,
-			100000000000ll, 1000000000000ll, 10000000000000ll, 100000000000000ll, 1000000000000000ll, 10000000000000000ll, 100000000000000000ll, 1000000000000000000ll };
-	};
+	template<typename = void> alignas(64) inline constexpr array<uint64_t, 20> powerOfTenUintRaw = generatePowerOfTen<uint64_t, 20>();
+
+	alignas(64) inline constexpr const uint64_t* __restrict powerOfTenUint{ powerOfTenUintRaw<>.data() };
+
+	template<typename = void> alignas(64) inline constexpr array<int64_t, 19> powerOfTenIntRaw = generatePowerOfTen<int64_t, 19>();
+
+	alignas(64) inline constexpr const int64_t* __restrict powerOfTenInt{ powerOfTenIntRaw<>.data() };
 
 	template<typename value_type> struct integer_parser;
 
-	template<int_types value_type> struct integer_parser<value_type> : public pow_tables<>, public exp_tables<> {
+	template<int_types value_type> struct integer_parser<value_type> {
 		constexpr integer_parser() noexcept = default;
 
 		JSONIFIER_INLINE static value_type mul128Generic(value_type ab, value_type cd, value_type& hi) noexcept {
@@ -182,7 +188,7 @@ namespace jsonifier::internal {
 						expValue *= expSign;
 						const auto fractionalCorrection = expValue > fracDigits
 							? fracValue * powerOfTenInt[expValue - fracDigits]
-							: (fracDigits - expValue < static_cast<int64_t>(std::size(powerOfTenInt)) ? fracValue / powerOfTenInt[fracDigits - expValue] : value_type{});
+							: (fracDigits - expValue < static_cast<int64_t>(powerOfTenIntRaw<>.size()) ? fracValue / powerOfTenInt[fracDigits - expValue] : value_type{});
 						return (expSign > 0) ? ((value <= (doubleMax / powerExp))
 													   ? (multiply(value, powerExp), (fractionalCorrection <= doubleMax - value) ? (value += fractionalCorrection, iter) : nullptr)
 													   : nullptr)
@@ -629,7 +635,7 @@ namespace jsonifier::internal {
 		}
 	};
 
-	template<uint_types value_type> struct integer_parser<value_type> : public pow_tables<>, public exp_tables<> {
+	template<uint_types value_type> struct integer_parser<value_type> {
 		constexpr integer_parser() noexcept = default;
 
 		JSONIFIER_INLINE static value_type umul128Generic(value_type ab, value_type cd, value_type& hi) noexcept {
@@ -730,7 +736,7 @@ namespace jsonifier::internal {
 						expValue *= expSign;
 						const auto fractionalCorrection = expValue > fracDigits
 							? fracValue * powerOfTenUint[expValue - fracDigits]
-							: (fracDigits - expValue < static_cast<int64_t>(std::size(powerOfTenUint)) ? fracValue / powerOfTenUint[fracDigits - expValue] : value_type{});
+							: (fracDigits - expValue < static_cast<int64_t>(powerOfTenUintRaw<>.size()) ? fracValue / powerOfTenUint[fracDigits - expValue] : value_type{});
 						return (expSign > 0) ? ((value <= (doubleMax / powerExp))
 													   ? (multiply(value, powerExp), (fractionalCorrection <= doubleMax - value) ? (value += fractionalCorrection, iter) : nullptr)
 													   : nullptr)
@@ -1049,7 +1055,7 @@ namespace jsonifier::internal {
 
 namespace jsonifier::internal {
 
-	template<bool negative> static constexpr uint64_t compValAddition{ [] {
+	template<bool negative> alignas(64) inline constexpr uint64_t compValAddition{ [] {
 		if constexpr (negative) {
 			return 1ULL;
 		} else {
@@ -1057,30 +1063,30 @@ namespace jsonifier::internal {
 		}
 	}() };
 
-	template<typename v_type, bool negative> inline static constexpr array<std::make_unsigned_t<v_type>, 256> genRawCompVals() {
+	template<typename v_type, bool negative> consteval array<std::make_unsigned_t<v_type>, 256ULL> genRawCompVals() {
 		constexpr auto max_value{ static_cast<std::make_unsigned_t<v_type>>(std::numeric_limits<std::remove_cvref_t<v_type>>::max()) + compValAddition<negative> };
-		array<std::make_unsigned_t<v_type>, 256> returnValuesInternal{};
-		returnValuesInternal['0'] = (max_value - 0) / 10;
-		returnValuesInternal['1'] = (max_value - 1) / 10;
-		returnValuesInternal['2'] = (max_value - 2) / 10;
-		returnValuesInternal['3'] = (max_value - 3) / 10;
-		returnValuesInternal['4'] = (max_value - 4) / 10;
-		returnValuesInternal['5'] = (max_value - 5) / 10;
-		returnValuesInternal['6'] = (max_value - 6) / 10;
-		returnValuesInternal['7'] = (max_value - 7) / 10;
-		returnValuesInternal['8'] = (max_value - 8) / 10;
-		returnValuesInternal['9'] = (max_value - 9) / 10;
-		return returnValuesInternal;
-	};
+		array<std::make_unsigned_t<v_type>, 256ULL> returnValues{};
+		returnValues[static_cast<uint64_t>('0')] = (max_value - 0) / 10;
+		returnValues[static_cast<uint64_t>('1')] = (max_value - 1) / 10;
+		returnValues[static_cast<uint64_t>('2')] = (max_value - 2) / 10;
+		returnValues[static_cast<uint64_t>('3')] = (max_value - 3) / 10;
+		returnValues[static_cast<uint64_t>('4')] = (max_value - 4) / 10;
+		returnValues[static_cast<uint64_t>('5')] = (max_value - 5) / 10;
+		returnValues[static_cast<uint64_t>('6')] = (max_value - 6) / 10;
+		returnValues[static_cast<uint64_t>('7')] = (max_value - 7) / 10;
+		returnValues[static_cast<uint64_t>('8')] = (max_value - 8) / 10;
+		returnValues[static_cast<uint64_t>('9')] = (max_value - 9) / 10;
+		return returnValues;
+	}
 
-	template<typename v_type, bool negative> alignas(64) static constexpr array<std::make_unsigned_t<v_type>, 256> rawCompVals{ genRawCompVals<v_type, negative>() };
+	template<typename v_type, bool negative> alignas(64) inline constexpr auto compValsRaw{ genRawCompVals<v_type, negative>() };
 
-	template<typename v_type, bool negative> alignas(64) static constexpr const std::make_unsigned_t<v_type>* __restrict compVals{ rawCompVals<v_type, negative>.data() };
+	template<typename v_type, bool negative> alignas(64) inline constexpr const std::make_unsigned_t<v_type>* __restrict compVals{ compValsRaw<v_type, negative>.data() };
 
 	namespace int_swar {
 
-		template<uint8_types auto repeat, uint_types v_type> static constexpr v_type repeat_bytes_v =
-			static_cast<v_type>(static_cast<v_type>(0x0101010101010101ull) * static_cast<v_type>(repeat));
+		template<uint8_types auto repeat, uint_types v_type>
+		alignas(64) inline constexpr v_type repeat_bytes_v = static_cast<v_type>(static_cast<v_type>(0x0101010101010101ull) * static_cast<v_type>(repeat));
 
 		template<uint_types v_type> JSONIFIER_INLINE v_type count_zeros(v_type value) noexcept {
 			if constexpr (std::endian::native == std::endian::little) {
@@ -1647,14 +1653,25 @@ namespace jsonifier::internal {
 		return iter;
 	}
 
-	template<typename = void> struct pow_tables {
-		alignas(64) static constexpr uint64_t powerOfTenUint[]{ 1ull, 10ull, 100ull, 1000ull, 10000ull, 100000ull, 1000000ull, 10000000ull, 100000000ull, 1000000000ull,
-			10000000000ull, 100000000000ull, 1000000000000ull, 10000000000000ull, 100000000000000ull, 1000000000000000ull, 10000000000000000ull, 100000000000000000ull,
-			1000000000000000000ull, 10000000000000000000ull };
+	template<typename value_type, uint64_t size> consteval array<value_type, size> genPowerOfTenTable() {
+		array<value_type, size> returnValues{};
+		value_type value{ 1 };
+		for (uint64_t x = 0; x < size; ++x) {
+			returnValues[x] = value;
+			if (x + 1 < size) {
+				value *= 10;
+			}
+		}
+		return returnValues;
+	}
 
-		alignas(64) static constexpr int64_t powerOfTenInt[]{ 1ll, 10ll, 100ll, 1000ll, 10000ll, 100000ll, 1000000ll, 10000000ll, 100000000ll, 1000000000ll, 10000000000ll,
-			100000000000ll, 1000000000000ll, 10000000000000ll, 100000000000000ll, 1000000000000000ll, 10000000000000000ll, 100000000000000000ll, 1000000000000000000ll };
-	};
+	alignas(64) inline constexpr auto powerOfTenUintRaw{ genPowerOfTenTable<uint64_t, 20ULL>() };
+
+	alignas(64) inline constexpr const uint64_t* __restrict powerOfTenUint{ powerOfTenUintRaw.data() };
+
+	alignas(64) inline constexpr auto powerOfTenIntRaw{ genPowerOfTenTable<int64_t, 19ULL>() };
+
+	alignas(64) inline constexpr const int64_t* __restrict powerOfTenInt{ powerOfTenIntRaw.data() };
 
 	JSONIFIER_INLINE static uint8_t peekByte(read_buffer_ptr iter, read_buffer_ptr end) noexcept {
 		return iter < end ? *iter : uint8_t{};
@@ -1675,7 +1692,7 @@ namespace jsonifier::internal {
 
 	template<typename value_type> struct integer_parser;
 
-	template<int_types value_type> struct integer_parser<value_type> : public pow_tables<>, public exp_tables<> {
+	template<int_types value_type> struct integer_parser<value_type> {
 		template<bool negative> JSONIFIER_INLINE static read_buffer_ptr parseInteger(value_type& value, read_buffer_ptr iter, read_buffer_ptr end) noexcept {
 			using v_type_local = std::make_unsigned_t<value_type>;
 			iter			   = parseSwarDigits<value_type, negative>(value, iter, end);
@@ -1873,7 +1890,7 @@ namespace jsonifier::internal {
 		}
 	};
 
-	template<uint_types value_type> struct integer_parser<value_type> : public pow_tables<>, public exp_tables<> {
+	template<uint_types value_type> struct integer_parser<value_type> {
 		JSONIFIER_INLINE static read_buffer_ptr parseInteger(value_type& value, read_buffer_ptr iter, read_buffer_ptr end) noexcept {
 			iter = parseSwarDigits<value_type, false>(value, iter, end);
 			if (!iter) [[unlikely]] {

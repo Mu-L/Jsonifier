@@ -65,14 +65,14 @@ namespace string_validation_tests {
 			return values;
 		}
 
-		constexpr size_t size() const {
+		constexpr uint64_t size() const {
 			return size_val;
 		}
 
 		constexpr unit_test_string() noexcept = default;
 
 		char values[256]{};
-		size_t size_val{};
+		uint64_t size_val{};
 	};
 
 	constexpr jsonifier::internal::array<unit_test_string, 35> inputValues{ { "\"\"", "\"Hello\"", "\"Hello\\nWorld\"", "\"Hello\\u0000World\"", "\"\\\"\\\\/\\b\\f\\n\\r\\t\"",

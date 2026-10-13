@@ -59,8 +59,8 @@ namespace jsonifier::internal {
 
 	template<typename value_type> using base_t = internal::remove_cvref_t<value_type>;
 
-	template<typename, typename> static constexpr bool is_same_v						  = false;
-	template<typename value_type> static constexpr bool is_same_v<value_type, value_type> = true;
+	template<typename, typename> alignas(64) inline constexpr bool is_same_v						  = false;
+	template<typename value_type> alignas(64) inline constexpr bool is_same_v<value_type, value_type> = true;
 
 	template<typename value_type>
 	concept has_static_size = requires() { base_t<value_type>::staticSize; };
@@ -309,7 +309,7 @@ namespace jsonifier::internal {
 	concept same_character_size =
 		requires { sizeof(typename base_t<value_type01>::value_type) == sizeof(typename base_t<value_type02>::value_type); } && string_t<value_type01> && string_t<value_type02>;
 
-	template<typename value_type> constexpr bool hasSizeEqualToZero{ std::tuple_size_v<base_t<value_type>> == 0 };
+	template<typename value_type> alignas(64) inline constexpr bool hasSizeEqualToZero{ std::tuple_size_v<base_t<value_type>> == 0 };
 
 	template<typename value_type>
 	concept has_get_template = requires(base_t<value_type> value) {
@@ -451,6 +451,6 @@ namespace jsonifier::internal {
 	template<typename value_type>
 	concept inline_contained_t = pod_t<remove_cvref_t<value_type>> || (has_contained_type_v<value_type> && pod_t<remove_cvref_t<contained_type_t<value_type>>>);
 
-	template<typename value_type> static constexpr bool inline_contained_v = inline_contained_t<value_type>;
+	template<typename value_type> alignas(64) inline constexpr bool inline_contained_v = inline_contained_t<value_type>;
 
 }

@@ -18,7 +18,7 @@
 
 namespace JSONIFIER_NAMESPACE::zmij {
 	struct dec_fp {
-		long long sig;
+		int64_t sig;
 		bool negative;
 		int32_t exp;
 	};
@@ -26,47 +26,6 @@ namespace JSONIFIER_NAMESPACE::zmij {
 
 	#include <jsonifier-incl/simd/simd_config.hpp>
 	#include <jsonifier-incl/simd/avx.hpp>
-
-	#if defined(__has_builtin) && !defined(ZMIJ_NO_BUILTINS)
-		#define ZMIJ_HAS_BUILTIN(x) __has_builtin(x)
-	#else
-		#define ZMIJ_HAS_BUILTIN(x) 0
-	#endif
-	#ifdef __has_cpp_attribute
-		#define ZMIJ_HAS_CPP_ATTRIBUTE(x) __has_cpp_attribute(x)
-	#else
-		#define ZMIJ_HAS_CPP_ATTRIBUTE(x) 0
-	#endif
-
-	#if ZMIJ_HAS_CPP_ATTRIBUTE(unlikely)
-		#define ZMIJ_UNLIKELY unlikely
-	#else
-		#define ZMIJ_UNLIKELY
-	#endif
-
-	#ifdef ZMIJ_OPTIMIZE_SIZE
-	#elif defined(__OPTIMIZE_SIZE__)
-		#define ZMIJ_OPTIMIZE_SIZE 1
-	#else
-		#define ZMIJ_OPTIMIZE_SIZE 0
-	#endif
-	#ifndef ZMIJ_USE_EXP_STRING_TABLE
-		#define ZMIJ_USE_EXP_STRING_TABLE ZMIJ_OPTIMIZE_SIZE == 0
-	#endif
-
-	#if JSONIFIER_COMPILER_GCC || JSONIFIER_COMPILER_CLANG
-		#define ZMIJ_ASM(x) asm x
-	#else
-		#define ZMIJ_ASM(x)
-	#endif
-
-	#ifdef ZMIJ_CONST_DECL
-
-	#elif JSONIFIER_ARCH_ARM64
-		#define ZMIJ_CONST_DECL
-	#else
-		#define ZMIJ_CONST_DECL static constexpr
-	#endif
 
 namespace JSONIFIER_NAMESPACE::zmij {
 	namespace impl {
@@ -80,9 +39,9 @@ namespace JSONIFIER_NAMESPACE::zmij {
 	#endif
 
 	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-		constexpr bool is_big_endian = true;
+		alignas(64) inline constexpr bool is_big_endian = true;
 	#else
-		constexpr bool is_big_endian = false;
+		alignas(64) inline constexpr bool is_big_endian = false;
 	#endif
 
 		JSONIFIER_INLINE auto bswap64(uint64_t x) noexcept -> uint64_t {
@@ -133,13 +92,6 @@ namespace JSONIFIER_NAMESPACE::zmij {
 			uint64_t lo;
 		};
 
-	#ifdef ZMIJ_USE_INT128
-	#elif defined(__SIZEOF_INT128__)
-		#define ZMIJ_USE_INT128 1
-	#else
-		#define ZMIJ_USE_INT128 0
-	#endif
-
 	#if ZMIJ_USE_INT128
 		using uint128_t = __uint128_t;
 	#else
@@ -147,9 +99,9 @@ namespace JSONIFIER_NAMESPACE::zmij {
 	#endif
 
 	#if ZMIJ_USE_INT128 && JSONIFIER_PLATFORM_MAC
-		constexpr bool use_umul128_hi64 = true;
+		alignas(64) inline constexpr bool use_umul128_hi64 = true;
 	#else
-		constexpr bool use_umul128_hi64 = false;
+		alignas(64) inline constexpr bool use_umul128_hi64 = false;
 	#endif
 
 		JSONIFIER_INLINE constexpr auto umul128(uint64_t x, uint64_t y) noexcept -> uint128_t {
@@ -432,11 +384,24 @@ namespace JSONIFIER_NAMESPACE::zmij {
 			using traits						 = float_traits<double>;
 			static constexpr int32_t num_entries = traits::max_fixed_dec_exp - traits::min_fixed_dec_exp + 1;
 
-			struct alignas(JSONIFIER_ARCH_ARM64 && !ZMIJ_OPTIMIZE_SIZE ? 32 : 1) entry {
+	#if JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_ANY_AVX)
+			static constexpr uint64_t entry_alignment = 64;
+	#else
+			static constexpr uint64_t entry_alignment = JSONIFIER_ARCH_ARM64 && !ZMIJ_OPTIMIZE_SIZE ? 32 : 1;
+	#endif
+
+			struct alignas(entry_alignment) entry {
+	#if JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_ANY_AVX)
+				alignas(16) uint8_t shuffle[2][16];
+	#endif
 				uint8_t start_pos;
 				uint8_t point_pos;
 
 				uint8_t shift_pos;
+
+	#if JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_ANY_AVX)
+				uint8_t last_digit_pos[2];
+	#endif
 
 				uint8_t end_pos[traits::max_digits10];
 			};
@@ -448,6 +413,22 @@ namespace JSONIFIER_NAMESPACE::zmij {
 					e.start_pos = dec_exp < 0 ? static_cast<uint8_t>(1 - dec_exp) : static_cast<uint8_t>(0);
 					e.point_pos = dec_exp >= 0 ? static_cast<uint8_t>(1 + dec_exp) : static_cast<uint8_t>(1);
 					e.shift_pos = static_cast<uint8_t>(static_cast<int32_t>(e.point_pos) + (dec_exp >= 0 ? 1 : 0));
+
+	#if JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_ANY_AVX)
+					constexpr int32_t bcd_size = 16;
+					for (int32_t extra = 0; extra < 2; ++extra) {
+						int32_t len				= bcd_size + extra - 1;
+						e.last_digit_pos[extra] = static_cast<uint8_t>(len + ((dec_exp >= 0 && dec_exp < len) ? 1 : 0));
+					}
+
+					int32_t point_slot = (dec_exp >= 0 && dec_exp <= 14) ? 1 + dec_exp : 128;
+					for (int32_t extra = 0; extra < 2; ++extra) {
+						uint8_t bcd_idx = extra == 0 ? 1 : 0;
+						for (int32_t i = 0; i < bcd_size; ++i) {
+							e.shuffle[extra][i] = i == point_slot ? static_cast<uint8_t>(0xFF) : bcd_idx++;
+						}
+					}
+	#endif
 
 					for (int32_t n = 1; n <= traits::max_digits10; ++n) {
 						int32_t end_pos = n;
@@ -461,7 +442,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 
 			[[maybe_unused]] JSONIFIER_INLINE constexpr auto get(int32_t dec_exp) const noexcept -> const entry& {
 				constexpr auto min = traits::min_fixed_dec_exp;
-				return data[static_cast<uint32_t>(dec_exp - min)];
+				return data[static_cast<uint64_t>(dec_exp - min)];
 			}
 
 			entry data[num_entries]{};
@@ -483,19 +464,17 @@ namespace JSONIFIER_NAMESPACE::zmij {
 			return std::bit_cast<jsonifier::read_buffer_ptr>(&data[value * 2ULL]);
 		}
 
-		constexpr int32_t div10k_exp  = 40;
-		constexpr uint32_t div10k_sig = static_cast<uint32_t>((1ULL << div10k_exp) / 10000ULL + 1ULL);
-		constexpr uint32_t neg10k	  = static_cast<uint32_t>((1ULL << 32) - 10000ULL);
+		alignas(64) inline constexpr int32_t div10k_exp	 = 40;
+		alignas(64) inline constexpr uint32_t div10k_sig = static_cast<uint32_t>((1ULL << div10k_exp) / 10000ULL + 1ULL);
+		alignas(64) inline constexpr uint32_t neg10k	 = static_cast<uint32_t>((1ULL << 32) - 10000ULL);
+		alignas(64) inline constexpr int32_t div100_exp	 = 19;
+		alignas(64) inline constexpr uint32_t div100_sig = (1U << div100_exp) / 100U + 1U;
+		alignas(64) inline constexpr uint32_t neg100	 = (1U << 16) - 100U;
+		alignas(64) inline constexpr int32_t div10_exp	 = 10;
+		alignas(64) inline constexpr uint32_t div10_sig	 = (1U << div10_exp) / 10U + 1U;
+		alignas(64) inline constexpr uint32_t neg10		 = (1U << 8) - 10U;
 
-		constexpr int32_t div100_exp  = 19;
-		constexpr uint32_t div100_sig = (1U << div100_exp) / 100U + 1U;
-		constexpr uint32_t neg100	  = (1U << 16) - 100U;
-
-		constexpr int32_t div10_exp	 = 10;
-		constexpr uint32_t div10_sig = (1U << div10_exp) / 10U + 1U;
-		constexpr uint32_t neg10	 = (1U << 8) - 10U;
-
-		constexpr uint64_t zeros = 0x0101010101010101ULL * static_cast<uint64_t>('0');
+		alignas(64) inline constexpr uint64_t zeros = 0x0101010101010101ULL * static_cast<uint64_t>('0');
 
 		[[maybe_unused]] JSONIFIER_INLINE auto write_if(jsonifier::write_buffer_ptr buffer, uint32_t digit, bool condition) noexcept -> jsonifier::write_buffer_ptr {
 			*buffer = static_cast<uint8_t>(static_cast<uint32_t>('0') + digit);
@@ -708,7 +687,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 		JSONIFIER_INLINE void write_digits(jsonifier::write_buffer_ptr buffer, dec_digits<64>::digits_type digits, bool drop_leading_zero) noexcept {
 			if constexpr (!JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_ANY_SIMD)) {
 				jsonifier::pow2MemcpyWrapper<sizeof(digits)>(buffer, &digits);
-				memmove(buffer, buffer + (drop_leading_zero ? 1 : 0), sizeof(digits));
+				jsonifier::pow2MemmoveWrapper<sizeof(digits)>(buffer, buffer + (drop_leading_zero ? 1 : 0));
 				return;
 			}
 	#if JSONIFIER_CHECK_FOR_INSTRUCTION((JSONIFIER_NEON | JSONIFIER_SVE2))
@@ -723,7 +702,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 
 		JSONIFIER_INLINE void write_digits(jsonifier::write_buffer_ptr buffer, uint64_t digits, bool drop_leading_zero) noexcept {
 			jsonifier::pow2MemcpyWrapper<sizeof(digits)>(buffer, &digits);
-			memmove(buffer, buffer + (drop_leading_zero ? 1 : 0), sizeof(digits));
+			jsonifier::pow2MemmoveWrapper<sizeof(digits)>(buffer, buffer + (drop_leading_zero ? 1 : 0));
 		}
 
 		JSONIFIER_INLINE auto write_exp_float_simd(jsonifier::write_buffer_ptr buffer, const dec_digits<32>& dig, int32_t last_digit, bool has_last_digit, bool has_extra_digit,
@@ -754,7 +733,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 		struct to_decimal_result {
 			bool has_last_digit = false;
 			int32_t last_digit	= 0;
-			long long sig;
+			int64_t sig;
 			int32_t exp;
 		};
 
@@ -770,7 +749,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 				uint128 pow10	= static_data.pow10_significands[-dec_exp - 1];
 				uint128 p		= umul192_hi128(pow10.hi, pow10.lo, static_cast<uint64_t>(bin_sig) << shift);
 
-				long long integral	= static_cast<long long>(p.hi >> extra_shift);
+				int64_t integral	= static_cast<int64_t>(p.hi >> extra_shift);
 				uint64_t fractional = (p.hi << (64 - extra_shift)) | (p.lo >> extra_shift);
 
 				uint64_t half_ulp = pow10.hi >> (extra_shift + 1 - static_cast<int32_t>(shift));
@@ -791,7 +770,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 			int32_t dec_exp				   = use_umul128_hi64 ? static_cast<int32_t>(umul128_hi64(static_cast<uint64_t>(bin_exp), log10_2_sig << (64 - log10_2_exp)))
 															  : compute_dec_exp(static_cast<int32_t>(bin_exp));
 			ZMIJ_ASM(("" : "+r"(dec_exp)));
-			uint8_t shift = static_cast<uint8_t>(exp_shift_table::enable ? static_data.exp_shifts.data[static_cast<size_t>(bin_exp + float_traits<double>::exp_offset)]
+			uint8_t shift = static_cast<uint8_t>(exp_shift_table::enable ? static_data.exp_shifts.data[static_cast<uint64_t>(bin_exp + float_traits<double>::exp_offset)]
 																		 : compute_exp_shift(static_cast<int32_t>(bin_exp), dec_exp + 1) + extra_shift);
 			uint64_t even = 1ULL - static_cast<uint64_t>(bin_sig & 1U);
 
@@ -801,7 +780,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 				uint64_t pow10_hi				 = static_data.pow10_significands[-dec_exp - 1].hi;
 				uint64_t p						 = umul128_hi64(pow10_hi + 1ULL, static_cast<uint64_t>(bin_sig) << shift);
 
-				long long integral	= static_cast<long long>(p >> extra_shift_32);
+				int64_t integral	= static_cast<int64_t>(p >> extra_shift_32);
 				uint64_t fractional = p & ((1ULL << extra_shift_32) - 1ULL);
 
 				uint64_t half_ulp = (pow10_hi >> (65 - static_cast<int32_t>(shift))) + even;
@@ -818,7 +797,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 				uint128 pow10 = static_data.pow10_significands[-dec_exp - 1];
 				uint128 p	  = umul192_hi128(pow10.hi, pow10.lo, static_cast<uint64_t>(bin_sig) << shift);
 
-				long long integral	= static_cast<long long>(p.hi >> extra_shift);
+				int64_t integral	= static_cast<int64_t>(p.hi >> extra_shift);
 				uint64_t fractional = (p.hi << (64 - extra_shift)) | (p.lo >> extra_shift);
 
 				uint64_t half_ulp = (pow10.hi >> (extra_shift + 1 - static_cast<int32_t>(shift))) + even;
@@ -859,7 +838,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 		}
 		auto dec		= JSONIFIER_NAMESPACE::zmij::impl::to_decimal<double>(bin_sig ^ traits::implicit_bit, bin_exp, bin_sig != 0ULL);
 		auto last_digit = -static_cast<int32_t>(dec.has_last_digit) & dec.last_digit;
-		return { dec.sig * 10LL + static_cast<long long>(last_digit), negative, dec.exp };
+		return { dec.sig * 10LL + static_cast<int64_t>(last_digit), negative, dec.exp };
 	}
 
 	namespace detail {
@@ -888,25 +867,25 @@ namespace JSONIFIER_NAMESPACE::zmij {
 					jsonifier::pow2MemcpyWrapper<2>(buffer, "0");
 					return buffer + 1;
 				}
-				dec				  = JSONIFIER_NAMESPACE::zmij::impl::to_decimal<Float>(bin_sig, 1LL, true);
-				long long dec_sig = dec.sig * 10LL + static_cast<long long>(-static_cast<int32_t>(dec.has_last_digit) & dec.last_digit);
-				int32_t dec_exp	  = dec.exp;
-				while (dec_sig < static_cast<long long>(threshold)) {
+				dec				= JSONIFIER_NAMESPACE::zmij::impl::to_decimal<Float>(bin_sig, 1LL, true);
+				int64_t dec_sig = dec.sig * 10LL + static_cast<int64_t>(-static_cast<int32_t>(dec.has_last_digit) & dec.last_digit);
+				int32_t dec_exp = dec.exp;
+				while (dec_sig < static_cast<int64_t>(threshold)) {
 					dec_sig *= 10LL;
 					--dec_exp;
 				}
-				long long q		   = static_cast<long long>(JSONIFIER_NAMESPACE::zmij::impl::div10(static_cast<uint64_t>(dec_sig)));
+				int64_t q		   = static_cast<int64_t>(JSONIFIER_NAMESPACE::zmij::impl::div10(static_cast<uint64_t>(dec_sig)));
 				int32_t last_digit = static_cast<int32_t>(dec_sig - q * 10LL);
 				dec				   = { last_digit != 0, last_digit, q, dec_exp };
 			} else {
 				dec = JSONIFIER_NAMESPACE::zmij::impl::to_decimal<Float>(bin_sig | traits::implicit_bit, bin_exp, bin_sig != 0ULL);
 			}
 			bool has_last_digit	 = dec.has_last_digit;
-			bool has_extra_digit = dec.sig >= static_cast<long long>(threshold);
+			bool has_extra_digit = dec.sig >= static_cast<int64_t>(threshold);
 			int32_t dec_exp		 = dec.exp + traits::max_digits10 - 2 + (has_extra_digit ? 1 : 0);
 			if constexpr (traits::num_bits == 32) {
-				if (dec.sig < static_cast<long long>(1e6)) [[ZMIJ_UNLIKELY]] {
-					dec.sig		   = 10LL * dec.sig + static_cast<long long>(-static_cast<int32_t>(has_last_digit) & dec.last_digit);
+				if (dec.sig < static_cast<int64_t>(1e6)) [[ZMIJ_UNLIKELY]] {
+					dec.sig		   = 10LL * dec.sig + static_cast<int64_t>(-static_cast<int32_t>(has_last_digit) & dec.last_digit);
 					has_last_digit = false;
 					--dec_exp;
 				}
@@ -927,15 +906,29 @@ namespace JSONIFIER_NAMESPACE::zmij {
 
 				const auto& layout = fixed_layouts->get(dec_exp);
 				buffer += layout.start_pos;
-				write_digits(buffer, dig.digits, !has_extra_digit);
-				buffer[bcd_size + (has_extra_digit ? 1 : 0) - 1] = last_digit_char;
-				uint32_t point_pos								 = layout.point_pos;
-				memmove(start + layout.shift_pos, start + point_pos, bcd_size);
-				start[point_pos] = '.';
-				return buffer + layout.end_pos[static_cast<size_t>(num_digits + (has_extra_digit ? 1 : 0) - 1)];
+	#if JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_ANY_AVX)
+				if constexpr (bcd_size == 16) {
+					const uint64_t extra_index = has_extra_digit ? 1 : 0;
+					__m128i shuffle			   = internal::simd::gatherValues<jsonifier::jsonifier_simd_int_128>(layout.shuffle[extra_index]);
+					internal::simd::storeU(internal::simd::opShuffle(dig.digits, shuffle), buffer);
+					buffer[bcd_size]						   = static_cast<uint8_t>(_mm_extract_epi8(dig.digits, 15));
+					start[layout.point_pos]					   = '.';
+					buffer[layout.last_digit_pos[extra_index]] = last_digit_char;
+					return buffer + layout.end_pos[static_cast<uint64_t>(num_digits + (has_extra_digit ? 1 : 0) - 1)];
+				} else {
+	#endif
+					write_digits(buffer, dig.digits, !has_extra_digit);
+					buffer[bcd_size + (has_extra_digit ? 1 : 0) - 1] = last_digit_char;
+					uint32_t point_pos								 = layout.point_pos;
+					jsonifier::pow2MemmoveWrapper<static_cast<uint64_t>(bcd_size)>(start + layout.shift_pos, start + point_pos);
+					start[point_pos] = '.';
+					return buffer + layout.end_pos[static_cast<uint64_t>(num_digits + (has_extra_digit ? 1 : 0) - 1)];
+	#if JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_ANY_AVX)
+				}
+	#endif
 			}
 			if constexpr (traits::num_bits == 32 && exp_float_shuffle_table::enable) {
-				uint64_t exp_data = d->exp_strings.data[static_cast<size_t>(dec_exp + exp_string_table::offset)];
+				uint64_t exp_data = d->exp_strings.data[static_cast<uint64_t>(dec_exp + exp_string_table::offset)];
 				return write_exp_float_simd(buffer, dig, dec.last_digit, has_last_digit, has_extra_digit, exp_data);
 			} else {
 				buffer += (has_extra_digit ? 1 : 0);
@@ -947,7 +940,7 @@ namespace JSONIFIER_NAMESPACE::zmij {
 				buffer -= (buffer - 1 == start + 1 ? 1 : 0);
 
 				if constexpr (exp_string_table::enable) {
-					uint64_t exp_data = d->exp_strings.data[static_cast<size_t>(dec_exp + exp_string_table::offset)];
+					uint64_t exp_data = d->exp_strings.data[static_cast<uint64_t>(dec_exp + exp_string_table::offset)];
 					int32_t len		  = static_cast<int32_t>(exp_data >> 48);
 					if constexpr (is_big_endian) {
 						exp_data = bswap64(exp_data);

@@ -293,7 +293,7 @@ namespace jsonifier::internal {
 
 	template<typename... value_type> struct tuple_size<std::tuple<value_type...>> : public integral_constant<sizeof...(value_type)> {};
 
-	template<typename tuple_type> static constexpr uint64_t tuple_size_v = tuple_size<remove_cvref_t<tuple_type>>::value;
+	template<typename tuple_type> alignas(64) inline constexpr uint64_t tuple_size_v = tuple_size<remove_cvref_t<tuple_type>>::value;
 
 	template<typename... value_types> tuple(value_types&&...) -> tuple<value_types...>;
 
@@ -322,7 +322,7 @@ namespace jsonifier::internal {
 	template<typename target_type, typename tuple_type, typename integer_sequence> struct index_finder;
 
 	template<typename target_type, typename tuple_type, uint64_t... indices> struct index_finder<target_type, tuple_type, integer_sequence<indices...>> {
-		inline static constexpr uint64_t getIndex() {
+		inline static consteval uint64_t getIndex() {
 			completion_signal result{};
 			((result = index_tag<indices, target_type, tuple_type>::value) && ...);
 			return result.index;
@@ -336,30 +336,10 @@ namespace jsonifier::internal {
 		return std::forward<tuple_type>(tupleVal)[tag<index>{}];
 	}
 
-#if JSONIFIER_COMPILER_GCC && JSONIFIER_PLATFORM_MAC
-
-	template<typename... types> JSONIFIER_INLINE static constexpr auto makeTuple(types&&... args) noexcept {
-		auto result = tuple<types...>{};
-		if constexpr (sizeof...(types) > 0) {
-			constructInPlace<0>(result, std::forward<types>(args)...);
-		}
-		return result;
-	}
-
-	template<uint64_t I, typename tuple_t, typename arg_t, typename... rest_t>
-	JSONIFIER_INLINE static constexpr void constructInPlace(tuple_t& t, arg_t&& arg, rest_t&&... rest) noexcept {
-		t[tag<I>{}] = std::forward<arg_t>(arg);
-		if constexpr (sizeof...(rest) > 0) {
-			constructInPlace<I + 1>(t, std::forward<rest_t>(rest)...);
-		}
-	}
-
-#else
 	template<typename... types> JSONIFIER_INLINE static constexpr auto makeTuple(types&&... args) noexcept {
 		using base = type_list_t<types...>;
 		return tuple<types...>{ base{ { std::forward<types>(args) }... } };
 	}
-#endif
 
 	template<typename... tuple_types> struct join_tuples;
 

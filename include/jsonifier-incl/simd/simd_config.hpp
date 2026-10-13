@@ -12,37 +12,37 @@
 namespace JSONIFIER_NAMESPACE {
 
 	#if JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_AVX512)
-	static constexpr jsonifier_backend default_backend{ jsonifier_backend::avx512 };
+	alignas(64) inline constexpr jsonifier_backend default_backend{ jsonifier_backend::avx512 };
 	#elif JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_AVX2)
-	static constexpr jsonifier_backend default_backend{ jsonifier_backend::avx2 };
+	alignas(64) inline constexpr jsonifier_backend default_backend{ jsonifier_backend::avx2 };
 	#elif JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_AVX)
-	static constexpr jsonifier_backend default_backend{ jsonifier_backend::avx };
+	alignas(64) inline constexpr jsonifier_backend default_backend{ jsonifier_backend::avx };
 	#elif JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_SVE2)
-	static constexpr jsonifier_backend default_backend{ jsonifier_backend::sve2 };
+	alignas(64) inline constexpr jsonifier_backend default_backend{ jsonifier_backend::sve2 };
 	#elif JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_NEON)
-	static constexpr jsonifier_backend default_backend{ jsonifier_backend::neon };
+	alignas(64) inline constexpr jsonifier_backend default_backend{ jsonifier_backend::neon };
 	#else
-	static constexpr jsonifier_backend default_backend{ jsonifier_backend::fallback };
+	alignas(64) inline constexpr jsonifier_backend default_backend{ jsonifier_backend::fallback };
 	#endif
 
 	using default_backend_traits = backend_traits<default_backend>;
 
-	static constexpr const char* cpu_arch_name{ default_backend_traits::name };
+	alignas(64) inline constexpr const char* cpu_arch_name{ default_backend_traits::name };
 
 	using jsonifier_simd_int_t = typename default_backend_traits::simd_int_t;
 
-	static constexpr uint64_t simdTapeStep{ default_backend_traits::tapeStep };
-	static constexpr uint64_t simdBlocksPerStep{ default_backend_traits::blocksPerStep };
-	static constexpr uint64_t simdBytesPerRegister{ backendBytesPerRegister<default_backend> };
+	alignas(64) inline constexpr uint64_t simdTapeStep{ default_backend_traits::tapeStep };
+	alignas(64) inline constexpr uint64_t simdBlocksPerStep{ default_backend_traits::blocksPerStep };
+	alignas(64) inline constexpr uint64_t simdBytesPerRegister{ backendBytesPerRegister<default_backend> };
 
 	#if JSONIFIER_CHECK_FOR_INSTRUCTION(JSONIFIER_SVE2)
 	template<typename value_type>
 	concept simd_int_sve2_type = std::same_as<std::remove_cvref_t<value_type>, jsonifier_simd_int_t>;
 	#endif
 
-	static constexpr uint64_t simdRegistersPerBlock{ 64 / simdBytesPerRegister };
-	static constexpr uint64_t simdBytesPerBlock{ 64 };
-	static constexpr uint64_t simdBytesPerStep = simdBlocksPerStep * simdBytesPerBlock;
+	alignas(64) inline constexpr uint64_t simdRegistersPerBlock{ 64 / simdBytesPerRegister };
+	alignas(64) inline constexpr uint64_t simdBytesPerBlock{ 64 };
+	alignas(64) inline constexpr uint64_t simdBytesPerStep = simdBlocksPerStep * simdBytesPerBlock;
 
 	static_assert(simdBytesPerRegister == sizeof(jsonifier_simd_int_t),
 		"simdBytesPerRegister disagrees with the actual register width; simdRegistersPerBlock and every bitmask collapse depend on these matching.");

@@ -99,7 +99,7 @@ namespace jsonifier::internal {
 
 	template<uint64_t sizeVal> string_literal(const char (&)[sizeVal]) -> string_literal<sizeVal>;
 
-	template<uint64_t size, size_t buffer_size> inline basic_stream<buffer_size>& operator<<(basic_stream<buffer_size>& os, const string_literal<size>& input) noexcept {
+	template<uint64_t size, uint64_t buffer_size> inline basic_stream<buffer_size>& operator<<(basic_stream<buffer_size>& os, const string_literal<size>& input) noexcept {
 		os << std::basic_string_view<char>{ input.data(), input.size() };
 		return os;
 	}
@@ -109,7 +109,7 @@ namespace jsonifier::internal {
 		return os;
 	}
 
-	template<string_literal literal> inline constexpr uint64_t escapedKeyLength() noexcept {
+	template<string_literal literal> inline consteval uint64_t escapedKeyLength() noexcept {
 		uint64_t newLength{};
 		for (uint64_t x = 0; x < literal.size(); ++x) {
 			const char c = literal[x];
@@ -118,7 +118,7 @@ namespace jsonifier::internal {
 		return newLength;
 	}
 
-	template<string_literal literal> inline constexpr string_literal<escapedKeyLength<literal>() + 1> escapeKeyLiteral() noexcept {
+	template<string_literal literal> inline consteval string_literal<escapedKeyLength<literal>() + 1> escapeKeyLiteral() noexcept {
 		constexpr uint64_t newLength{ escapedKeyLength<literal>() };
 		string_literal<newLength + 1> returnValues{};
 		uint64_t outIndex{};
@@ -135,6 +135,6 @@ namespace jsonifier::internal {
 		return returnValues;
 	}
 
-	template<string_literal literal> static constexpr auto escapedKeyLiteral{ escapeKeyLiteral<literal>() };
+	template<string_literal literal> alignas(64) inline constexpr auto escapedKeyLiteral{ escapeKeyLiteral<literal>() };
 
 }

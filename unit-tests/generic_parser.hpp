@@ -20,8 +20,8 @@ namespace generic_parser_tests {
 		return target.get(out);
 	}
 
-	inline constexpr jsonifier::parse_options comma{};
-	inline constexpr jsonifier::parse_options newLines{ .newLineDelimited = true };
+	alignas(64) inline constexpr jsonifier::parse_options comma{};
+	alignas(64) inline constexpr jsonifier::parse_options newLines{ .newLineDelimited = true };
 
 	struct stream_summary {
 		jsonifier::generic::error_code lastError{ jsonifier::generic::error_code::success };

@@ -82,7 +82,7 @@ namespace jsonifier {
 				reserve(sizeVal + newSize);
 			}
 
-			std::memmove(dataVal + posNew + newSize, dataVal + posNew, (sizeVal - posNew) * sizeof(value_type));
+			jsonifier::memmoveWrapper(dataVal + posNew + newSize, dataVal + posNew, (sizeVal - posNew) * sizeof(value_type));
 			std::copy(start.operator->(), start.operator->() + newSize, dataVal + posNew);
 			sizeVal += newSize;
 			allocator::construct(&dataVal[sizeVal], value_type{});
@@ -171,7 +171,7 @@ namespace jsonifier {
 				reserve((sizeVal + 1) * 2);
 			}
 			const auto newSize = sizeVal - positionNew;
-			std::memmove(dataVal + positionNew + 1, dataVal + positionNew, newSize * sizeof(value_type));
+			jsonifier::memmoveWrapper(dataVal + positionNew + 1, dataVal + positionNew, newSize * sizeof(value_type));
 			allocator::construct(&dataVal[positionNew], toInsert);
 			++sizeVal;
 		}
@@ -306,9 +306,9 @@ namespace jsonifier {
 		}
 
 		template<typename string_base_new> JSONIFIER_INLINE void swap(string_base_new&& other) noexcept {
-			std::swap(capacityVal, other.capacityVal);
-			std::swap(sizeVal, other.sizeVal);
-			std::swap(dataVal, other.dataVal);
+			jsonifier::internal::swap(capacityVal, other.capacityVal);
+			jsonifier::internal::swap(sizeVal, other.sizeVal);
+			jsonifier::internal::swap(dataVal, other.dataVal);
 		}
 
 		template<typename... arg_types> JSONIFIER_INLINE size_type findLastNotOf(arg_types&&... args) const noexcept {
@@ -1000,7 +1000,7 @@ namespace jsonifier {
 
 	template<uint64_t size> string_base(const char (&)[size]) -> string_base<size>;
 
-	template<uint64_t size, size_t buffer_size>
+	template<uint64_t size, uint64_t buffer_size>
 	JSONIFIER_INLINE internal::basic_stream<buffer_size>& operator<<(internal::basic_stream<buffer_size>& os, const string_base<size>& input) noexcept {
 		os << std::basic_string_view<char>{ input.data(), input.size() };
 		return os;

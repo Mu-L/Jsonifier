@@ -89,7 +89,7 @@ namespace string_literal_comparator_impl_tests {
 				if (buffer[pos] == buffer[pos + 1]) {
 					continue;
 				}
-				std::swap(buffer[pos], buffer[pos + 1]);
+				jsonifier::internal::swap(buffer[pos], buffer[pos + 1]);
 				jsonifier::read_buffer_ptr result =
 					jsonifier::internal::string_literal_comparator_impl<sl_type, localLiteral>::impl(std::bit_cast<jsonifier::read_buffer_ptr>(buffer.data()));
 				if (result != nullptr) {
@@ -175,7 +175,7 @@ namespace string_literal_comparator_impl_tests {
 		});
 	}
 
-	template<size_t... indices> inline static void runExhaustiveLengths(std::index_sequence<indices...>) {
+	template<uint64_t... indices> inline static void runExhaustiveLengths(std::integer_sequence<uint64_t, indices...>) {
 		(( void )(rt_ut::unit_test<"slc_exhaustive", true>::assert_eq(true,
 			 [] {
 				 return matchesExactly<alphabetSource<indices + 1>>() && detectsCorruptionAtEveryPosition<alphabetSource<indices + 1>>() &&
@@ -237,7 +237,7 @@ namespace string_literal_comparator_impl_tests {
 		rt_ut::unit_test<"slc_page_boundary_64", true>::assert_eq(true, [] {
 			return matchesAtPageBoundary<alphabetSource<64>>();
 		});
-		runExhaustiveLengths(std::make_index_sequence<80>{});
+		runExhaustiveLengths(std::make_integer_sequence<uint64_t, 80>{});
 		rt_ut::unit_test<"slc_driver_rejects_short_buffer", true>::assert_eq(true, [] {
 			static constexpr jsonifier::internal::string_literal needle{ "HelloWorld" };
 			std::string buffer{ "Hello" };

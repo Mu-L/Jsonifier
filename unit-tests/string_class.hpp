@@ -162,7 +162,7 @@ namespace string_class_tests {
 
 		rt_ut::unit_test<"string_append_repeatedly_forces_growth", true>::assert_eq(true, [] {
 			jsonifier::string s{};
-			for (int i = 0; i < 1000; ++i) {
+			for (int32_t i = 0; i < 1000; ++i) {
 				s += 'a';
 			}
 			bool allCorrect = s.size() == 1000;
@@ -193,7 +193,7 @@ namespace string_class_tests {
 
 		rt_ut::unit_test<"string_data_null_terminated_after_emplace_back", true>::assert_eq(true, [] {
 			jsonifier::string s{};
-			for (int i = 0; i < 50; ++i) {
+			for (int32_t i = 0; i < 50; ++i) {
 				s.emplace_back('q');
 			}
 			return s.data()[s.size()] == '\0' && s.size() == 50;
@@ -515,7 +515,7 @@ namespace string_class_tests {
 
 		rt_ut::unit_test<"string_repeated_grow_shrink_cycle_preserves_correctness", true>::assert_eq(true, [] {
 			jsonifier::string s{ "x" };
-			for (int i = 0; i < 20; ++i) {
+			for (int32_t i = 0; i < 20; ++i) {
 				s += "yyyyyyyyyy";
 				s.resize(s.size() > 5 ? s.size() - 3 : s.size());
 			}

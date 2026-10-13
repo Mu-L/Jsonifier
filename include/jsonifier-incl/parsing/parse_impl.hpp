@@ -1124,12 +1124,9 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 	template<typename value_type> static thread_local uint64_t elementCountHint{};
 
 	template<typename value_type>
-	static constexpr uint64_t maxHintedElements{ 4096 / sizeof(typename value_type::value_type) > 0 ? 4096 / sizeof(typename value_type::value_type) : 1 };
+	alignas(64) inline constexpr uint64_t maxHintedElements{ 4096 / sizeof(typename value_type::value_type) > 0 ? 4096 / sizeof(typename value_type::value_type) : 1 };
 
 	template<typename value_type> JSONIFIER_INLINE static void reserveFromHint(value_type& value) noexcept {
-		// The hint is shared by every array of this type and only grows, so for
-		// raw_json_data it would make each small nested array reserve the
-		// largest size seen anywhere in the document.
 		if constexpr (has_reserve<value_type> && !raw_json_t<typename value_type::value_type>) {
 			const uint64_t target = elementCountHint<value_type> < maxHintedElements<value_type> ? elementCountHint<value_type> : maxHintedElements<value_type>;
 			if constexpr (requires { value.capacity(); }) {
@@ -1160,9 +1157,9 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 		#pragma clang diagnostic pop
 	#endif
 
-	template<typename element_type> inline constexpr bool fullyOverwritten{ std::is_arithmetic_v<element_type> };
+	template<typename element_type> alignas(64) inline constexpr bool fullyOverwritten{ std::is_arithmetic_v<element_type> };
 
-	template<vector_t element_type> inline constexpr bool fullyOverwritten<element_type>{ fullyOverwritten<typename element_type::value_type> };
+	template<vector_t element_type> alignas(64) inline constexpr bool fullyOverwritten<element_type>{ fullyOverwritten<typename element_type::value_type> };
 
 	#if JSONIFIER_BACKEND_PASS == 0
 	template<typename value_type, typename iterator_type> JSONIFIER_INLINE static void moveAssignVec(value_type& value, iterator_type first, iterator_type last) {
@@ -1879,7 +1876,6 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 		using iterator_type = typename context_type::iterator_type;
 		using cursor		= cursor_t<options, context_type>;
 
-		// RFC 8259 number grammar: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
 		JSONIFIER_INLINE static bool isJsonNumber(string_view token) noexcept {
 			auto iter	   = token.data();
 			const auto end = iter + token.size();
@@ -1916,8 +1912,6 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 			return iter == end;
 		}
 
-		// Decodes the value in place, in a single pass: containers and strings go
-		// straight to the regular parsers, scalars are read from their token.
 		JSONIFIER_INLINE static iterator_type impl(value_type& value, iterator_type iter, uint64_t depth, context_type& context) noexcept {
 			if constexpr (!options.minified && !structural_context<context_type>) {
 				cursor::skipWhitespaceScalar(iter, context);
@@ -1943,7 +1937,7 @@ namespace JSONIFIER_INTERNAL_NAMESPACE {
 			const read_buffer_ptr endPtr = cursor::notAtEnd(iter, context) ? cursor::valuePtr(iter, context) : cursor::stringEnd(context);
 			uint64_t newSize			 = static_cast<uint64_t>(endPtr - newPtr);
 			if constexpr (!options.minified) {
-				while (newSize > 0 && whitespaceTable[static_cast<uint8_t>(newPtr[newSize - 1])]) {
+				while (newSize > 0 && whitespaceTable[static_cast<uint64_t>(newPtr[newSize - 1])]) {
 					--newSize;
 				}
 			}
